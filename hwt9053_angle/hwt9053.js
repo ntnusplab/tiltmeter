@@ -9,9 +9,10 @@ const net = require('net');
 const API_URL = process.env.API_URL;
 const DEVICE_ID = process.env.DEVICE_ID;
 const ANGLE_DIFFERENT_THERSHOLD = process.env.ANGLE_DIFFERENT_THERSHOLD;
-const API_BACKUP_URL = process.env.API_BACKUP_URL;
 const BACKUP_TCP_HOST = process.env.BACKUP_TCP_HOST;
 const BACKUP_TCP_PORT = process.env.BACKUP_TCP_PORT;
+const BACKUP_TCP_TEST = process.env.BACKUP_TCP_TEST;
+const SAMPLE_RATE = process.env.SAMPLE_RATE;
 
 if (!API_URL) {
     console.error('Error: API_URL is not defined in the .env file.');
@@ -34,6 +35,15 @@ if (!BACKUP_TCP_HOST) {
 
 } if (!BACKUP_TCP_PORT) {
     console.error('Error: BACKUP_TCP_PORT is not defined in the .env file.');
+    process.exit(1)
+}
+
+if (!BACKUP_TCP_TEST) {
+    console.error('Error: BACKUP_TCP_TEST is not defined in the .env file.');
+    process.exit(1)
+}
+if (!SAMPLE_RATE) {
+    console.error('Error: SAMPLE_RATE is not defined in the .env file.');
     process.exit(1)
 }
 
@@ -166,39 +176,30 @@ async function sendDataToTcpServer() {
         console.log("No data in payloadBuffer to send.");
         return;
     }
-
-    const client = new net.Socket();
-
-    client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {
-        console.log(`Connected to TCP server at ${BACKUP_TCP_HOST}:${BACKUP_TCP_PORT}`);
+    else {
+        const client = new net.Socket();
 
         while (payloadBuffer.length > 0) {
             const data = payloadBuffer.pop(); // 取出緩存中的數據
-            // const bufferData = Buffer.from(JSON.stringify(data));
-            let backup_payload = `$$$${DEVICE_ID},${data.sensing_time},${data.ang_x},${data.ang_y},${data.ang_z},${data.cpu_temperture},${data.cpu_voltage},${data.rssi}###`;
-            console.log("backup_payload: ", backup_payload);
-            // client.write(backup_payload);
 
             console.log(`[${new Date().toISOString()}] Sent data to TCP server:`, data);
             try {
-                axios.post(API_URL, data);
+                await axios.post(API_URL, data);
                 console.log(`[${new Date().toISOString()}] Sent to API_URL successfully.`);
             }
             catch (error) {
                 console.error(`[${new Date().toISOString()}] Error during data transmission:`, error.message);
             }
-
-            try {
-                let API_BACKUP_URL = `http://${BACKUP_TCP_HOST}:${BACKUP_TCP_PORT}/?data=${backup_payload}`
-                axios.get(API_BACKUP_URL);
-                console.log(`[${new Date().toISOString()}] Sent data to ${API_BACKUP_URL} successfully`);
-            }
-            catch (error) {
-                console.log(`[${new Date().toISOString()}] Error during data transmission:`, error.message);
+            if (BACKUP_TCP_TEST === true) {
+                client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {
+                    let backup_payload = `$$$${DEVICE_ID},${data.sensing_time},${data.ang_x},${data.ang_y},${data.ang_z},${data.cpu_temperture},${data.cpu_voltage},${data.rssi}###`;
+                    console.log("backup_payload: ", backup_payload);
+                    client.write(backup_payload);
+                });
+                client.end(); // 關閉連接
             }
         }
-        client.end(); // 關閉連接
-    });
+    }
 
     client.on('error', (err) => {
         console.error(`TCP client error:`, err.message);
@@ -212,10 +213,10 @@ async function sendDataToTcpServer() {
 // 每1分鐘發送一次讀取指令
 function scheduleSendCommand() {
     const now = new Date();
-    const msUntilNextMinute = 60000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+    const msUntilNextMinute = SAMPLE_RATE - (now.getSeconds() * 1000 + now.getMilliseconds());
     setTimeout(() => {
         sendCommand();
-        setInterval(sendCommand, 60 * 1000); // 確保每分鐘執行一次
+        setInterval(sendCommand, SAMPLE_RATE); // 確保每分鐘執行一次
     }, msUntilNextMinute);
 }
 

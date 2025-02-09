@@ -124,12 +124,12 @@ port.on('data', async (inputData) => {
                     rssi: rssi
                 };
 
-                console.log(payload);
+                // console.log(payload);
 
                 // 將資料添加到緩存中（插入到緩存的最前面）
                 payloadBuffer.unshift(payload);
 
-                console.log(`[${new Date().toISOString()}] Data added to buffer:`);
+                // console.log(`[${new Date().toISOString()}] Data added to buffer:`);
                 console.log("Payload Buffer:", payloadBuffer);
 
                 try {
@@ -182,7 +182,7 @@ async function sendDataToTcpServer() {
         while (payloadBuffer.length > 0) {
             const data = payloadBuffer.pop(); // 取出緩存中的數據
 
-            console.log(`[${new Date().toISOString()}] Sent data to TCP server:`, data);
+            console.log(`[${new Date().toISOString()}] Sent data to TCP server...`);
             try {
                 await axios.post(API_URL, data);
                 console.log(`[${new Date().toISOString()}] Sent to API_URL successfully.`);

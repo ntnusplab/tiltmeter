@@ -172,12 +172,12 @@ port.on('data', async (inputData) => {
 });
 
 async function sendDataToTcpServer() {
+    const client = new net.Socket();
     if (payloadBuffer.length === 0) {
         console.log("No data in payloadBuffer to send.");
         return;
     }
     else {
-        const client = new net.Socket();
 
         while (payloadBuffer.length > 0) {
             const data = payloadBuffer.pop(); // 取出緩存中的數據

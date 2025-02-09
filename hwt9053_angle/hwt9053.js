@@ -213,7 +213,7 @@ async function sendDataToTcpServer() {
 // 每1分鐘發送一次讀取指令
 function scheduleSendCommand() {
     const now = new Date();
-    const msUntilNextMinute = SAMPLE_RATE - (now.getSeconds() * 1000 + now.getMilliseconds());
+    const msUntilNextMinute = SAMPLE_RATE - ((now.getSeconds() * 1000 + now.getMilliseconds())%SAMPLE_RATE);
     setTimeout(() => {
         sendCommand();
         setInterval(sendCommand, SAMPLE_RATE); // 確保每分鐘執行一次

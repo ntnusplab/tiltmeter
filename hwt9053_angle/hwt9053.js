@@ -182,7 +182,7 @@ async function sendDataToTcpServer() {
         while (payloadBuffer.length > 0) {
             const data = payloadBuffer.pop(); // 取出緩存中的數據
 
-            console.log(`[${new Date().toISOString()}] Sent data to TCP server...`);
+            console.log(`[${new Date().toISOString()}] Sent data to DATABASE...`);
             try {
                 await axios.post(API_URL, data);
                 console.log(`[${new Date().toISOString()}] Sent to API_URL successfully.`);
@@ -193,7 +193,7 @@ async function sendDataToTcpServer() {
             if (BACKUP_TCP_TEST === true) {
                 client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {
                     let backup_payload = `$$$${DEVICE_ID},${data.sensing_time},${data.ang_x},${data.ang_y},${data.ang_z},${data.cpu_temperture},${data.cpu_voltage},${data.rssi}###`;
-                    console.log("backup_payload: ", backup_payload);
+                    console.log(`[${new Date().toISOString()}] Sent data to TCP server...`);
                     client.write(backup_payload);
                 });
                 client.end(); // 關閉連接
@@ -213,7 +213,7 @@ async function sendDataToTcpServer() {
 // 每1分鐘發送一次讀取指令
 function scheduleSendCommand() {
     const now = new Date();
-    const msUntilNextMinute = SAMPLE_RATE - ((now.getSeconds() * 1000 + now.getMilliseconds())%SAMPLE_RATE);
+    const msUntilNextMinute = SAMPLE_RATE - ((now.getSeconds() * 1000 + now.getMilliseconds()) % SAMPLE_RATE);
     setTimeout(() => {
         sendCommand();
         setInterval(sendCommand, SAMPLE_RATE); // 確保每分鐘執行一次

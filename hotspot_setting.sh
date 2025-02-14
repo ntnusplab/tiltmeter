@@ -45,7 +45,7 @@ fi
 
 # 使用 nmcli 創建並配置 Wi‑Fi 接入點
 echo "創建 Wi‑Fi 接入點..."
-sudo nmcli connection add type wifi ifname eth0 con-name "$CON_NAME" autoconnect yes \
+sudo nmcli connection add type wifi ifname wlan0 con-name "$CON_NAME" autoconnect yes \
     ssid "$SSID" \
     802-11-wireless.mode ap \
     802-11-wireless.band bg \

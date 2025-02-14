@@ -1,77 +1,70 @@
 #!/bin/bash
-# 此腳本用來根據參數切換 wlan0 模式：
-# enable  => 關閉 wpa_supplicant 並啟用熱點模式 (固定 IP + hostapd)
-# disable => 停用熱點模式並啟動 wpa_supplicant（恢復客戶端模式）
+# 本腳本根據 PiLink 的文章「如何僅使用 NetWorkManager 將 Raspi 變成 Wi-Fi 接入點」編寫，
+# 並提供命令列參數來修改 con-name、ssid 與 psk。
+# 文章來源：https://pilink.jp/zh-hans/wifi-ap_pl-r4/
 
-# 定義 dhcpcd 設定檔路徑
-DHCP_CONF="/etc/dhcpcd.conf"
+# 預設參數
+CON_NAME="rpi_ap"
+SSID="raspida-lan"
+PSK="password"
 
-# 定義固定 IP 區塊標記
-HOTSPOT_BLOCK_START="# HOTSPOT STATIC CONFIG BEGIN"
-HOTSPOT_BLOCK_END="# HOTSPOT STATIC CONFIG END"
-
-# 根據傳入的參數選擇動作
-if [ "$1" == "enable" ]; then
-    echo "啟用熱點模式：關閉 wpa_supplicant 並設定 wlan0 為固定 IP。"
-    
-    # 停用 wpa_supplicant 服務（避免 wlan0 自動連外網）
-    echo "停用 wpa_supplicant 服務..."
-    sudo systemctl stop wpa_supplicant.service
-    sudo systemctl disable wpa_supplicant.service
-
-    # 移除舊有的熱點設定區塊（如果存在）
-    sudo sed -i "/$HOTSPOT_BLOCK_START/,/$HOTSPOT_BLOCK_END/d" "$DHCP_CONF"
-    
-    # 在 /etc/dhcpcd.conf 末尾追加固定 IP 設定區塊
-    sudo bash -c "cat >> $DHCP_CONF" <<EOF
-
-$HOTSPOT_BLOCK_START
-interface wlan0
-    static ip_address=192.168.4.1/24
-    nohook wpa_supplicant
-$HOTSPOT_BLOCK_END
-EOF
-
-    echo "已於 $DHCP_CONF 加入固定 IP 設定。"
-
-    # 重啟 dhcpcd 服務使新設定生效
-    echo "重啟 dhcpcd 服務..."
-    sudo systemctl restart dhcpcd
-
-    # 啟動 hostapd 服務，將 wlan0 切換為 AP 模式
-    echo "啟動 hostapd 服務..."
-    sudo systemctl unmask hostapd
-    sudo systemctl enable hostapd
-    sudo systemctl start hostapd
-
-    echo "熱點模式已啟用，wlan0 現在運作於 AP 模式 (固定 IP: 192.168.4.1/24)。"
-
-elif [ "$1" == "disable" ]; then
-    echo "停用熱點模式，恢復客戶端模式並啟動 wpa_supplicant。"
-
-    # 移除 /etc/dhcpcd.conf 中的固定 IP 設定區塊
-    sudo sed -i "/$HOTSPOT_BLOCK_START/,/$HOTSPOT_BLOCK_END/d" "$DHCP_CONF"
-    echo "已從 $DHCP_CONF 移除固定 IP 設定。"
-
-    # 重啟 dhcpcd 服務使設定生效
-    echo "重啟 dhcpcd 服務..."
-    sudo systemctl restart dhcpcd
-
-    # 停止並禁用 hostapd 服務
-    echo "停止 hostapd 服務..."
-    sudo systemctl stop hostapd
-    sudo systemctl disable hostapd
-
-    # 啟動 wpa_supplicant 服務，恢復 wlan0 客戶端模式
-    echo "啟動 wpa_supplicant 服務..."
-    sudo systemctl enable wpa_supplicant
-    sudo systemctl start wpa_supplicant
-
-    echo "客戶端模式已恢復，wlan0 現在由 wpa_supplicant 管理。"
-
-else
-    echo "用法: $0 [enable|disable]"
-    echo "  enable  => 啟用熱點模式（關閉 wpa_supplicant，設定固定 IP，啟動 hostapd）"
-    echo "  disable => 停用熱點模式（移除固定 IP，停止 hostapd，啟動 wpa_supplicant）"
+# 解析命令列參數
+usage() {
+    echo "Usage: $0 [-n connection_name] [-s ssid] [-p password]"
     exit 1
+}
+
+while getopts "n:s:p:" opt; do
+    case $opt in
+        n)
+            CON_NAME="$OPTARG"
+            ;;
+        s)
+            SSID="$OPTARG"
+            ;;
+        p)
+            PSK="$OPTARG"
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+
+echo "使用以下設定建立接入點："
+echo "連線名稱 (con-name): $CON_NAME"
+echo "SSID: $SSID"
+echo "密碼 (psk): $PSK"
+
+# 停用 dnsmasq（若已安裝），避免與 NetworkManager 衝突
+if systemctl is-active --quiet dnsmasq; then
+    echo "dnsmasq 服務正在運行，正在停用..."
+    sudo systemctl stop dnsmasq
+    sudo systemctl disable dnsmasq
 fi
+
+# 使用 nmcli 創建並配置 Wi‑Fi 接入點
+echo "創建 Wi‑Fi 接入點..."
+sudo nmcli connection add type wifi ifname wlan0 con-name "$CON_NAME" autoconnect yes \
+    ssid "$SSID" \
+    802-11-wireless.mode ap \
+    802-11-wireless.band bg \
+    ipv4.method shared ipv4.address 192.168.2.1/24 \
+    wifi-sec.key-mgmt wpa-psk \
+    wifi-sec.pairwise ccmp \
+    wifi-sec.proto rsn \
+    wifi-sec.psk "$PSK"
+
+# 啟動接入點連線
+echo "啟動 Wi‑Fi 接入點..."
+sudo nmcli connection up "$CON_NAME"
+
+# 可選：重啟 NetworkManager 服務以確保配置生效
+echo "重啟 NetworkManager 服務..."
+sudo systemctl restart NetworkManager.service
+
+# 顯示接入點設定狀態（供確認用）
+echo "顯示接入點設定："
+nmcli connection show "$CON_NAME"
+
+echo "Wi‑Fi 接入點設定完成。請使用裝置連接 SSID '$SSID' 並使用密碼 '$PSK'。"

@@ -36,6 +36,20 @@ echo "連線名稱 (con-name): $CON_NAME"
 echo "SSID: $SSID"
 echo "密碼 (psk): $PSK"
 
+# 檢查是否已有重複的連線名稱
+dupCon=$(nmcli -g NAME connection show | grep -x "$CON_NAME")
+if [ -n "$dupCon" ]; then
+    echo "錯誤：已存在連線名稱 '$CON_NAME'，請更換或先刪除該連線。"
+    exit 1
+fi
+
+# 檢查是否已有重複的 SSID
+dupSsid=$(nmcli -g 802-11-wireless.ssid connection show | grep -x "$SSID")
+if [ -n "$dupSsid" ]; then
+    echo "錯誤：已存在 SSID '$SSID' 的接入點連線，請更換或先刪除該連線。"
+    exit 1
+fi
+
 # 停用 dnsmasq（若已安裝），避免與 NetworkManager 衝突
 if systemctl is-active --quiet dnsmasq; then
     echo "dnsmasq 服務正在運行，正在停用..."
@@ -68,3 +82,10 @@ echo "顯示接入點設定："
 nmcli connection show "$CON_NAME"
 
 echo "Wi‑Fi 接入點設定完成。請使用裝置連接 SSID '$SSID' 並使用密碼 '$PSK'。"
+
+# 手動加入 DNS 設定到 /etc/resolv.conf
+echo "手動加入 DNS 伺服器設定到 /etc/resolv.conf..."
+sudo sh -c 'echo "nameserver 8.8.8.8" >> /etc/resolv.conf'
+sudo sh -c 'echo "nameserver 8.8.4.4" >> /etc/resolv.conf'
+
+echo "DNS 設定已加入。"

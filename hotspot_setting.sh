@@ -68,6 +68,10 @@ else
         wifi-sec.psk "$PSK"
 fi
 
+# 啟動接入點連線
+echo "啟動 Wi‑Fi 接入點..."
+sudo nmcli connection up "$CON_NAME"
+
 # 顯示接入點設定狀態（供確認用）
 echo "顯示接入點設定："
 nmcli connection show "$CON_NAME"

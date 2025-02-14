@@ -96,3 +96,5 @@ else
 fi
 
 echo "DNS 設定檢查完成。"
+
+#記得關閉network manager的dns

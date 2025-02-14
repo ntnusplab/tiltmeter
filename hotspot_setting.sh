@@ -1,5 +1,5 @@
 #!/bin/bash
-# 本腳本根據 PiLink 的文章「如何僅使用 NetWorkManager 將 Raspi 變成 Wi-Fi 接入點」編寫，
+# 本腳本根據 PiLink 的文章「如何僅使用 NetWorkManager 將 Raspi 變成 Wi‑Fi 接入點」編寫，
 # 並提供命令列參數來修改 con-name、ssid 與 psk。
 # 文章來源：https://pilink.jp/zh-hans/wifi-ap_pl-r4/
 
@@ -79,8 +79,20 @@ nmcli connection show "$CON_NAME"
 echo "Wi‑Fi 接入點設定完成。請使用裝置連接 SSID '$SSID' 並使用密碼 '$PSK'。"
 
 # 手動加入 DNS 設定到 /etc/resolv.conf
-echo "手動加入 DNS 伺服器設定到 /etc/resolv.conf..."
-sudo sh -c 'echo "nameserver 8.8.8.8" >> /etc/resolv.conf'
-sudo sh -c 'echo "nameserver 8.8.4.4" >> /etc/resolv.conf'
+echo "檢查 /etc/resolv.conf 是否已包含 DNS 設定..."
 
-echo "DNS 設定已加入。"
+if grep -q "nameserver 8.8.8.8" /etc/resolv.conf; then
+    echo "已存在 nameserver 8.8.8.8"
+else
+    echo "加入 nameserver 8.8.8.8"
+    sudo sh -c 'echo "nameserver 8.8.8.8" >> /etc/resolv.conf'
+fi
+
+if grep -q "nameserver 8.8.4.4" /etc/resolv.conf; then
+    echo "已存在 nameserver 8.8.4.4"
+else
+    echo "加入 nameserver 8.8.4.4"
+    sudo sh -c 'echo "nameserver 8.8.4.4" >> /etc/resolv.conf'
+fi
+
+echo "DNS 設定檢查完成。"

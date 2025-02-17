@@ -111,7 +111,7 @@ port.on('data', async (inputData) => {
                 // 從 module 獲取額外資料
                 const cpuTemp = await getCpuTemperature().catch(() => null);
                 const cpuVolt = await getCpuVoltage().catch(() => null);
-                const rssi = await getRssi().catch(() => null);
+                // const rssi = await getRssi().catch(() => null);
 
                 // 準備要傳送的資料
                 const payload = {
@@ -121,7 +121,7 @@ port.on('data', async (inputData) => {
                     ang_z: ang_z.toFixed(3),
                     cpu_temperture: cpuTemp,
                     cpu_voltage: cpuVolt,
-                    rssi: rssi
+                    rssi: rssi || null
                 };
 
                 // console.log(payload);

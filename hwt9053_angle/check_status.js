@@ -57,6 +57,8 @@ function getRssi() {
         parser.on('data', (data) => {
             if (data.includes('+QENG') && !data.includes('AT+QENG')) {
                 const parts = data.split(',');
+                console.log(`Received response: ${data}`);
+                console.log(`Response parts: ${parts}`);
                 if (parts.length >= 18) {
                     const rssi = parts[parts.length - 3];
                     console.log(`RSSI: ${rssi} dBm`);

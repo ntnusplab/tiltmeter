@@ -111,8 +111,8 @@ port.on('data', async (inputData) => {
                 // 從 module 獲取額外資料
                 const cpuTemp = await getCpuTemperature().catch(() => null);
                 const cpuVolt = await getCpuVoltage().catch(() => null);
-                // const rssi = await getRssi().catch(() => null);
-                const rssi = null
+                const rssi = await getRssi().catch(() => null);
+                // const rssi = null
 
                 // 準備要傳送的資料
                 const payload = {

@@ -55,20 +55,21 @@ function getRssi() {
         const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
         parser.on('data', (data) => {
-            if (data.includes('+QENG') && !data.includes('AT+QENG')) {
+            // if (data.includes('+QENG') && !data.includes('AT+QENG')) {
                 const parts = data.split(',');
                 console.log(`Received response: ${data}`);
                 console.log(`Response parts: ${parts}`);
-                if (parts.length >= 18) {
-                    const rssi = parts[parts.length - 3];
-                    console.log(`RSSI: ${rssi} dBm`);
-                    resolve(parseInt(rssi));
-                    port.close(); // Close the port after successful read
-                } else {
-                    reject('Response format does not contain the expected RSSI value.');
-                    port.close(); // Close the port on error
-                }
-            }
+                // if (parts.length >= 18) {
+                //     const rssi = parts[parts.length - 3];
+                //     console.log(`RSSI: ${rssi} dBm`);
+                //     resolve(parseInt(rssi));
+                //     port.close(); // Close the port after successful read
+                // } else {
+                //     reject('Response format does not contain the expected RSSI value.');
+                //     port.close(); // Close the port on error
+                // }
+                port.close(); // Close the port after successful read
+            // }
         });
 
         port.on('open', () => {

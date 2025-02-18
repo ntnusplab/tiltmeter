@@ -38,14 +38,13 @@ function getCpuVoltage() {
         });
     });
 }
-
-// Function to get RSSI using SerialPort
 function getRssi() {
     return new Promise((resolve, reject) => {
         const portPath = '/dev/ttyUSB2';
         const baudRate = 115200;
         const atCommand = 'AT+QENG="servingcell"';
 
+        // 開啟串口
         const port = new SerialPort({ path: portPath, baudRate }, (err) => {
             if (err) {
                 return reject(`Error opening serial port: ${err.message}`);
@@ -54,24 +53,29 @@ function getRssi() {
 
         const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
 
+        // 當收到資料時
         parser.on('data', (data) => {
-            // if (data.includes('+QENG') && !data.includes('AT+QENG')) {
-                const parts = data.split(',');
+            // 檢查是否為我們需要處理的回應資料
+            if (data.includes('+QENG') && !data.includes('AT+QENG')) {
                 console.log(`Received response: ${data}`);
+                const parts = data.split(',');
                 console.log(`Response parts: ${parts}`);
-                // if (parts.length >= 18) {
-                //     const rssi = parts[parts.length - 3];
-                //     console.log(`RSSI: ${rssi} dBm`);
-                //     resolve(parseInt(rssi));
-                //     port.close(); // Close the port after successful read
-                // } else {
-                //     reject('Response format does not contain the expected RSSI value.');
-                //     port.close(); // Close the port on error
-                // }
-                port.close(); // Close the port after successful read
-            // }
+
+                if (parts.length >= 3) {
+                    // 擷取倒數第三個欄位，並去除可能的空白
+                    const rssi = parts[parts.length - 3].trim();
+                    console.log(`Extracted RSSI: ${rssi}`);
+                    // 將字串轉換為整數後 resolve
+                    resolve(parseInt(rssi));
+                } else {
+                    reject('Response format does not contain the expected RSSI value.');
+                }
+                // 無論成功或失敗，讀取後都關閉串口
+                port.close();
+            }
         });
 
+        // 當串口成功開啟時發送 AT 指令
         port.on('open', () => {
             console.log(`Sending command: ${atCommand}`);
             port.write(atCommand + '\r\n', (err) => {

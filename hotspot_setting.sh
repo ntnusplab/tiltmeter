@@ -2,7 +2,7 @@
 
 # 預設參數
 CON_NAME="tiltmeter"
-SSID="tiltmeter_0"
+SSID=$(hostname)
 PSK="28579684"
 
 # 解析命令列參數

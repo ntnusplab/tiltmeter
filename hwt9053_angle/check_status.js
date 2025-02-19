@@ -38,6 +38,8 @@ function getCpuVoltage() {
         });
     });
 }
+
+// Function to get RSSI from a serial port
 function getRssi() {
     return new Promise((resolve, reject) => {
         const portPath = '/dev/ttyUSB2';
@@ -92,9 +94,44 @@ function getRssi() {
     });
 }
 
+// 新增的函數：取得記憶體使用百分比
+function getMemoryUsagePercentage() {
+    return new Promise((resolve, reject) => {
+        exec('free -m', (error, stdout, stderr) => {
+            if (error || stderr) {
+                reject(`Error getting memory usage: ${error || stderr}`);
+                return;
+            }
+            // 解析 free -m 的輸出，尋找 "Mem:" 開頭的那一行
+            const lines = stdout.split('\n');
+            const memLine = lines.find(line => line.startsWith('Mem:'));
+            if (!memLine) {
+                reject('Could not parse memory usage.');
+                return;
+            }
+            const parts = memLine.split(/\s+/);
+            // parts 格式: ["Mem:", "total", "used", "free", "shared", "buff/cache", "available"]
+            if (parts.length < 3) {
+                reject('Memory usage output does not have enough columns.');
+                return;
+            }
+            const total = parseInt(parts[1]);
+            const used = parseInt(parts[2]);
+            if (total === 0) {
+                reject('Total memory is zero.');
+                return;
+            }
+            // 計算百分比，保留小數點後兩位
+            const percentage = ((used / total) * 100).toFixed(2);
+            resolve(percentage);
+        });
+    });
+}
+
 // Export functions as a module
 module.exports = {
     getCpuTemperature,
     getCpuVoltage,
-    getRssi
+    getRssi,
+    getMemoryUsagePercentage  // 新增的記憶體監控函數，只回傳使用百分比
 };

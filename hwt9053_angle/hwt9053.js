@@ -1,7 +1,7 @@
 require('dotenv').config(); // 使用 dotenv 管理環境變數
 const { SerialPort } = require('serialport');
 const axios = require('axios');
-const { getCpuTemperature, getCpuVoltage, getRssi } = require('./check_status');
+const { getCpuTemperature, getCpuVoltage, getRssi, getMemoryUsagePercentage } = require('./check_status');
 const DailyLogger = require('./dailyLogger'); // 引入模組
 const net = require('net');
 
@@ -112,6 +112,7 @@ port.on('data', async (inputData) => {
                 const cpuTemp = await getCpuTemperature().catch(() => null);
                 const cpuVolt = await getCpuVoltage().catch(() => null);
                 const rssi = await getRssi().catch(() => null);
+                const memUsage = await getMemoryUsagePercentage().catch(() => null);
                 // const rssi = null
 
                 // 準備要傳送的資料

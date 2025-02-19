@@ -4,9 +4,9 @@
 # 文章來源：https://pilink.jp/zh-hans/wifi-ap_pl-r4/
 
 # 預設參數
-CON_NAME="rpi_ap"
-SSID="raspida-lan"
-PSK="password"
+CON_NAME="tiltmeter"
+SSID="tiltmeter_0"
+PSK="28579684"
 
 # 解析命令列參數
 usage() {

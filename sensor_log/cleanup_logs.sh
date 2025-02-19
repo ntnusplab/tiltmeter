@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 設定資料夾路徑
-LOG_DIR="/home/admin/sensor_log"
+LOG_DIR="/home/admin/tiltmeter/sensor_log"
 
 # 當前日期
 CURRENT_DATE=$(date +%Y-%m-%d)

@@ -128,7 +128,6 @@ function getMemoryUsagePercentage() {
     });
 }
 
-// 新增的函數：取得儲存空間使用百分比
 function getDiskUsagePercentage() {
     return new Promise((resolve, reject) => {
         exec('df /', (error, stdout, stderr) => {
@@ -148,9 +147,11 @@ function getDiskUsagePercentage() {
                 reject('Unexpected df output format.');
                 return;
             }
-            // 假設第五欄為使用百分比 (例如 "40%")
+            // 取得使用百分比字串（例如 "40%"）
             const usage = parts[4].trim();
-            resolve(usage);
+            // 移除百分比符號，轉換為整數後回傳
+            const numericUsage = parseInt(usage.replace('%', ''));
+            resolve(numericUsage);
         });
     });
 }

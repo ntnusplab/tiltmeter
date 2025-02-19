@@ -94,7 +94,7 @@ function getRssi() {
     });
 }
 
-// 新增的函數：取得記憶體使用百分比
+// 新增的函數：取得記憶體使用百分比，只回傳使用百分比
 function getMemoryUsagePercentage() {
     return new Promise((resolve, reject) => {
         exec('free -m', (error, stdout, stderr) => {
@@ -128,10 +128,38 @@ function getMemoryUsagePercentage() {
     });
 }
 
+// 新增的函數：取得儲存空間使用百分比
+function getDiskUsagePercentage() {
+    return new Promise((resolve, reject) => {
+        exec('df /', (error, stdout, stderr) => {
+            if (error || stderr) {
+                reject(`Error getting disk usage: ${error || stderr}`);
+                return;
+            }
+            // 將輸出內容依換行拆分，取第二行資訊
+            const lines = stdout.split('\n');
+            if (lines.length < 2) {
+                reject('Unexpected output from df command.');
+                return;
+            }
+            // 解析第二行，通常格式為: Filesystem, 1K-blocks, Used, Available, Use%, Mounted on
+            const parts = lines[1].split(/\s+/);
+            if (parts.length < 5) {
+                reject('Unexpected df output format.');
+                return;
+            }
+            // 假設第五欄為使用百分比 (例如 "40%")
+            const usage = parts[4].trim();
+            resolve(usage);
+        });
+    });
+}
+
 // Export functions as a module
 module.exports = {
     getCpuTemperature,
     getCpuVoltage,
     getRssi,
-    getMemoryUsagePercentage  // 新增的記憶體監控函數，只回傳使用百分比
+    getMemoryUsagePercentage,
+    getDiskUsagePercentage  // 新增的儲存空間監控函數
 };

@@ -14,6 +14,7 @@ const BACKUP_TCP_HOST = process.env.BACKUP_TCP_HOST;
 const BACKUP_TCP_PORT = process.env.BACKUP_TCP_PORT;
 const BACKUP_TCP_TEST = process.env.BACKUP_TCP_TEST;
 const SAMPLE_RATE = process.env.SAMPLE_RATE;
+const SERIALPORT_PATH = process.env.SERIALPORT_PATH;
 
 if (!API_URL) {
     console.error('Error: API_URL is not defined in the .env file.');
@@ -22,6 +23,11 @@ if (!API_URL) {
 
 if (!DEVICE_ID) {
     console.error('Error: DEVICE_ID is not defined in the .env file.');
+    process.exit(1);
+}
+
+if (DEVICE_ID === "tiltmeter_default") {
+    console.error('Error: DEVICE_ID need to change in the .env file.');
     process.exit(1);
 }
 
@@ -50,6 +56,11 @@ if (!SAMPLE_RATE) {
     process.exit(1);
 }
 
+if (!SERIALPORT_PATH) {
+    console.error('Error: SERIALPORT_PATH is not defined in the .env file.');
+    process.exit(1);
+}
+
 const READ_ACCELERATION_COMMAND = Buffer.from([0x50, 0x03, 0x00, 0x3D, 0x00, 0x06, 0x59, 0x85]);
 let startTime = Date.now(); // 當前絕對時間，毫秒
 let startHrtime = process.hrtime.bigint(); // 高精度時間，納秒
@@ -70,7 +81,7 @@ function syncTimeAndSchedule() {
 
 // 串口設定
 const port = new SerialPort({
-    path: '/dev/ttyS0', // 請依實際情況修改串口路徑
+    path: SERIALPORT_PATH, // 請依實際情況修改串口路徑
     baudRate: 115200,
     dataBits: 8,
     stopBits: 1,
@@ -190,7 +201,7 @@ async function sendDataToTcpServer(payload) {
                 const startDateStr = lastTime.toISOString().split('T')[0];
                 const currentPayloadDayStr = currentPayloadTime.toISOString().split('T')[0];
                 const dates = getDateRange(startDateStr, currentPayloadDayStr);
-                
+
                 let unsentEntries = [];
                 for (const date of dates) {
                     const sensorLogFilename = `../sensor_log/sensor_log_${date}.json`;
@@ -201,10 +212,10 @@ async function sendDataToTcpServer(payload) {
                         const filtered = logEntries.filter(entry => {
                             const entryTime = new Date(entry.sensing_time);
                             return entryTime > lastTime &&
-                                   entryTime <= currentPayloadTime &&
-                                   entry.hasOwnProperty('ang_x') &&
-                                   entry.hasOwnProperty('ang_y') &&
-                                   entry.hasOwnProperty('ang_z');
+                                entryTime <= currentPayloadTime &&
+                                entry.hasOwnProperty('ang_x') &&
+                                entry.hasOwnProperty('ang_y') &&
+                                entry.hasOwnProperty('ang_z');
                         });
                         unsentEntries = unsentEntries.concat(filtered);
                     } catch (readError) {

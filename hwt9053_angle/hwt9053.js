@@ -134,7 +134,7 @@ port.on('data', async (inputData) => {
                     memUsage: memUsage,
                     diskUsage: diskUsage
                 };
-
+                console.log(payload);
                 try {
                     await sendDataToTcpServer(payload);
                 } catch (error) {

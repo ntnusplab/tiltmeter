@@ -235,16 +235,13 @@ async function sendDataToTcpServer(payload) {
                         break;
                     }
                 }
-            } else {
-                lastSuccessTime = payload.sensing_time;
             }
-        } else {
-            lastSuccessTime = payload.sensing_time;
         }
     } catch (error) {
         console.error(`[${new Date().toISOString()}] Error during data transmission:`, error.message);
         // 傳輸失敗時不更新 lastSuccessTime，也不進行補傳
     }
+    lastSuccessTime = payload.sensing_time;
 
     // 備援 TCP 傳輸（若啟用）
     if (BACKUP_TCP_TEST === true) {

@@ -62,29 +62,6 @@ fi
 echo "啟動 Wi‑Fi 接入點..."
 sudo nmcli connection up "$CON_NAME"
 
-# # 顯示接入點設定狀態（供確認用）
-# echo "顯示接入點設定："
-# nmcli connection show "$CON_NAME"
-
 echo "Wi‑Fi 接入點設定完成。請使用裝置連接 SSID '$SSID' 並使用密碼 '$PSK'。"
-
-# 手動加入 DNS 設定到 /etc/resolv.conf
-echo "檢查 /etc/resolv.conf 是否已包含 DNS 設定..."
-
-if grep -q "nameserver 8.8.8.8" /etc/resolv.conf; then
-    echo "已存在 nameserver 8.8.8.8"
-else
-    echo "加入 nameserver 8.8.8.8"
-    sudo sh -c 'echo "nameserver 8.8.8.8" >> /etc/resolv.conf'
-fi
-
-if grep -q "nameserver 8.8.4.4" /etc/resolv.conf; then
-    echo "已存在 nameserver 8.8.4.4"
-else
-    echo "加入 nameserver 8.8.4.4"
-    sudo sh -c 'echo "nameserver 8.8.4.4" >> /etc/resolv.conf'
-fi
-
-echo "DNS 設定檢查完成。"
 
 #記得關閉network manager的dns還有disable modemmanager

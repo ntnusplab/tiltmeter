@@ -3,7 +3,8 @@
 LED_PATH="/sys/class/leds/ACT"
 
 # 設定要 ping 的 IP 位址，這裡以 8.8.8.8 為例，你可以自行修改
-PING_IP="tilt.smartiout.com"
+IP="tilt.smartiout.com"
+PORT="443"
 
 # 將 LED trigger 設為 none，以便手動控制 LED
 echo none > "${LED_PATH}/trigger"
@@ -35,10 +36,10 @@ led_blink() {
 
 # 主迴圈：每隔 1 分鐘執行一次 ping 指令，根據結果切換 LED 模式
 while true; do
-    if ping -c 1 "$PING_IP" > /dev/null 2>&1; then
+    if nc -z -v -w 10 "$IP" "$PORT" > /dev/null 2>&1; then
         # 當 ping 成功時，讓 LED 常亮 60 秒
         led_on
-        sleep 60
+        sleep 5
     else
         # 當 ping 失敗時，讓 LED 閃爍 60 秒
         led_blink 60

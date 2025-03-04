@@ -22,4 +22,4 @@ fi
 APN="$1"
 
 echo "正在使用 APN: $APN 啟動 4G 連線..."
-sudo waveshare-CM -s "$APN"
+sudo waveshare-CM -s "$APN" &

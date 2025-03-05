@@ -1,7 +1,6 @@
 require('dotenv').config(); // 使用 dotenv 管理環境變數
 const { SerialPort } = require('serialport');
 const axios = require('axios');
-const fs = require('fs');
 const { getCpuTemperature, getCpuVoltage, getRssi, getMemoryUsagePercentage, getDiskUsagePercentage } = require('./check_status');
 const DailyLogger = require('./dailyLogger'); // 引入日誌模組
 const net = require('net');
@@ -170,97 +169,73 @@ port.on('data', async (inputData) => {
     }
 });
 
-// 輔助函數：取得日期區間（含頭尾）
-function getDateRange(startDateStr, endDateStr) {
-    const dates = [];
-    let currentDate = new Date(startDateStr);
-    const endDate = new Date(endDateStr);
-    while (currentDate <= endDate) {
-        dates.push(currentDate.toISOString().split('T')[0]);
-        currentDate.setDate(currentDate.getDate() + 1);
-    }
-    return dates;
-}
+let retryBuffer = []; // 用來存放發送失敗的 payload
 
 async function sendDataToTcpServer(payload) {
     const client = new net.Socket();
     console.log(`[${new Date().toISOString()}] Sending data to DATABASE...`);
+    
     try {
+        // 先嘗試發送新的 payload
         await axios.post(API_URL, payload);
         console.log(`[${new Date().toISOString()}] Sent to API_URL successfully.`);
-
-        const sampleRateMs = Number(SAMPLE_RATE);
-        const threshold = 1.5 * sampleRateMs;
-        const currentPayloadTime = new Date(payload.sensing_time);
-
-        if (lastSuccessTime) {
-            const lastTime = new Date(lastSuccessTime);
-            const diff = currentPayloadTime - lastTime;
-            if (diff > threshold) {
-                console.log(`[${new Date().toISOString()}] Detected gap of ${diff} ms exceeding threshold (${threshold} ms). Initiating retransmission.`);
-                const startDateStr = lastTime.toISOString().split('T')[0];
-                const currentPayloadDayStr = currentPayloadTime.toISOString().split('T')[0];
-                const dates = getDateRange(startDateStr, currentPayloadDayStr);
-
-                let unsentEntries = [];
-                for (const date of dates) {
-                    const sensorLogFilename = `../sensor_log/sensor_log_${date}.json`;
-                    try {
-                        const data = await fs.promises.readFile(sensorLogFilename, 'utf8');
-                        let logEntries = JSON.parse(data);
-                        // 過濾條件： sensing_time 在 (lastTime, currentPayloadTime] 且必須包含 ang_x、ang_y、ang_z
-                        const filtered = logEntries.filter(entry => {
-                            const entryTime = new Date(entry.sensing_time);
-                            return entryTime > lastTime &&
-                                entryTime <= currentPayloadTime &&
-                                entry.hasOwnProperty('ang_x') &&
-                                entry.hasOwnProperty('ang_y') &&
-                                entry.hasOwnProperty('ang_z');
-                        });
-                        unsentEntries = unsentEntries.concat(filtered);
-                    } catch (readError) {
-                        console.error(`[${new Date().toISOString()}] Error reading log file for date ${date}:`, readError.message);
-                    }
-                }
-                // JSON 中較早的資料在前，直接反轉即可讓 sensing_time 較大的先補傳
-                unsentEntries = unsentEntries.reverse();
-                console.log(`[${new Date().toISOString()}] Found ${unsentEntries.length} unsent entries to resend.`);
-                for (const entry of unsentEntries) {
-                    try {
-                        await axios.post(API_URL, entry);
-                        lastSuccessTime = entry.sensing_time;
-                        console.log(`[${new Date().toISOString()}] Resent entry from ${entry.sensing_time} successfully.`);
-                    } catch (resendError) {
-                        console.error(`[${new Date().toISOString()}] Failed to resend entry from ${entry.sensing_time}:`, resendError.message);
-                        break;
-                    }
-                }
-            }
-        }
+        lastSuccessTime = payload.sensing_time; // 更新成功時間
+        
+        // 僅當新 payload 發送成功後才嘗試補傳 buffer 中的資料
+        await resendBufferedData();
     } catch (error) {
         console.error(`[${new Date().toISOString()}] Error during data transmission:`, error.message);
-        // 傳輸失敗時不更新 lastSuccessTime，也不進行補傳
+        // 發送失敗時，將 payload 放入 buffer 以便後續重發
+        retryBuffer.push(payload);
     }
-    lastSuccessTime = payload.sensing_time;
 
-    // 備援 TCP 傳輸（若啟用）
+    // 備援 TCP 傳輸
     if (BACKUP_TCP_TEST === true) {
-        client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {
-            let backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z},${payload.cpu_temperture},${payload.cpu_voltage},${payload.rssi}###`;
-            console.log(`[${new Date().toISOString()}] Sent data to TCP server...`);
-            client.write(backup_payload, () => {
-                client.end();
-            });
-        });
-        // 若連線失敗，error 事件將會觸發
-        client.on('error', (err) => {
-            console.error(`TCP client error:`, err.message);
-        });
-        client.on('close', () => {
-            console.log("TCP connection closed.");
-        });
+        sendBackupTcpData(payload, client);
     }
 }
+
+// 嘗試補傳 buffer 內的資料
+async function resendBufferedData() {
+    if (retryBuffer.length === 0) return;
+    
+    console.log(`[${new Date().toISOString()}] Found ${retryBuffer.length} buffered entries to resend.`);
+    
+    let successfulEntries = [];
+    for (const entry of retryBuffer) {
+        try {
+            await axios.post(API_URL, entry);
+            console.log(`[${new Date().toISOString()}] Resent entry from ${entry.sensing_time} successfully.`);
+            successfulEntries.push(entry);
+        } catch (resendError) {
+            console.error(`[${new Date().toISOString()}] Failed to resend entry from ${entry.sensing_time}:`, resendError.message);
+            // 如果補傳失敗，暫停後續重傳，等待下一次成功後再試
+            break;
+        }
+    }
+    
+    // 移除已成功補傳的資料
+    retryBuffer = retryBuffer.filter(entry => !successfulEntries.includes(entry));
+}
+
+function sendBackupTcpData(payload, client) {
+    client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {
+        let backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z},${payload.cpu_temperture},${payload.cpu_voltage},${payload.rssi}###`;
+        console.log(`[${new Date().toISOString()}] Sent data to TCP server...`);
+        client.write(backup_payload, () => {
+            client.end();
+        });
+    });
+    
+    client.on('error', (err) => {
+        console.error(`TCP client error:`, err.message);
+    });
+    
+    client.on('close', () => {
+        console.log("TCP connection closed.");
+    });
+}
+
 
 function scheduleSendCommand() {
     const now = new Date();

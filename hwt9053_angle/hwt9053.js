@@ -69,6 +69,22 @@ let dataBuffer = Buffer.alloc(0);
 const dailyLogger = new DailyLogger();
 // 用來記錄上次成功傳輸的 payload.sensing_time，初始為 null
 let lastSuccessTime = null;
+const bufferFilePath = path.join(__dirname, 'retryBuffer.json');
+
+// // 檔案名稱
+// const retryBufferFile = 'retryBuffer.json';
+
+// 初始化 retryBuffer，從檔案讀取，如果檔案不存在則建立空陣列
+let retryBuffer = [];
+if (fs.existsSync(retryBufferFile)) {
+    try {
+        const data = fs.readFileSync(retryBufferFile, 'utf8');
+        retryBuffer = JSON.parse(data);
+    } catch (e) {
+        console.error(`[${new Date().toISOString()}] Error reading ${retryBufferFile}:`, e);
+        retryBuffer = [];
+    }
+}
 
 function syncTimeAndSchedule() {
     console.log(`[${new Date().toISOString()}] Time synchronized using system clock.`);
@@ -169,24 +185,49 @@ port.on('data', async (inputData) => {
     }
 });
 
-let retryBuffer = []; // 用來存放發送失敗的 payload
+// 讀取 JSON 檔案中的 buffer，若檔案不存在則回傳空陣列
+async function readBufferFile() {
+    try {
+        const data = await fs.readFile(bufferFilePath, 'utf8');
+        return JSON.parse(data);
+    } catch (err) {
+        // 若檔案不存在或讀取失敗，則返回空陣列
+        return [];
+    }
+}
+
+// 將傳入的 buffer 陣列寫回 JSON 檔案
+async function writeBufferFile(buffer) {
+    try {
+        await fs.writeFile(bufferFilePath, JSON.stringify(buffer, null, 2));
+    } catch (err) {
+        console.error(`[${new Date().toISOString()}] Error writing to ${bufferFilePath}:`, err.message);
+    }
+}
+
+// 將 payload 追加到 JSON 檔案中
+async function appendToBufferFile(payload) {
+    const buffer = await readBufferFile();
+    buffer.push(payload);
+    await writeBufferFile(buffer);
+}
 
 async function sendDataToTcpServer(payload) {
     const client = new net.Socket();
     console.log(`[${new Date().toISOString()}] Sending data to DATABASE...`);
-    
+
     try {
-        // 先嘗試發送新的 payload
+        // 嘗試發送新的 payload
         await axios.post(API_URL, payload);
         console.log(`[${new Date().toISOString()}] Sent to API_URL successfully.`);
         lastSuccessTime = payload.sensing_time; // 更新成功時間
-        
-        // 僅當新 payload 發送成功後才嘗試補傳 buffer 中的資料
+
+        // 發送成功後，嘗試從 JSON 檔案中補傳資料
         await resendBufferedData();
     } catch (error) {
         console.error(`[${new Date().toISOString()}] Error during data transmission:`, error.message);
-        // 發送失敗時，將 payload 放入 buffer 以便後續重發
-        retryBuffer.push(payload);
+        // 發送失敗時，直接將 payload 寫入 JSON 檔案以便後續重傳
+        await appendToBufferFile(payload);
     }
 
     // 備援 TCP 傳輸
@@ -195,27 +236,28 @@ async function sendDataToTcpServer(payload) {
     }
 }
 
-// 嘗試補傳 buffer 內的資料
+// 補傳 JSON 檔案內的資料
 async function resendBufferedData() {
-    if (retryBuffer.length === 0) return;
-    
-    console.log(`[${new Date().toISOString()}] Found ${retryBuffer.length} buffered entries to resend.`);
-    
-    let successfulEntries = [];
-    for (const entry of retryBuffer) {
+    const buffer = await readBufferFile();
+    if (buffer.length === 0) return;
+
+    console.log(`[${new Date().toISOString()}] Found ${buffer.length} buffered entries to resend.`);
+
+    // 建立一個新的陣列，存放尚未成功傳送的資料
+    const newBuffer = [];
+    for (const entry of buffer) {
         try {
             await axios.post(API_URL, entry);
             console.log(`[${new Date().toISOString()}] Resent entry from ${entry.sensing_time} successfully.`);
-            successfulEntries.push(entry);
         } catch (resendError) {
             console.error(`[${new Date().toISOString()}] Failed to resend entry from ${entry.sensing_time}:`, resendError.message);
-            // 如果補傳失敗，暫停後續重傳，等待下一次成功後再試
-            break;
+            // 補傳失敗則保留該筆資料
+            newBuffer.push(entry);
+            // 可選：如果希望中斷後續傳送，可在此處 break; 不過此範例會嘗試全部傳送
         }
     }
-    
-    // 移除已成功補傳的資料
-    retryBuffer = retryBuffer.filter(entry => !successfulEntries.includes(entry));
+    // 將尚未成功的資料重新寫回 JSON 檔案
+    await writeBufferFile(newBuffer);
 }
 
 function sendBackupTcpData(payload, client) {
@@ -226,11 +268,11 @@ function sendBackupTcpData(payload, client) {
             client.end();
         });
     });
-    
+
     client.on('error', (err) => {
         console.error(`TCP client error:`, err.message);
     });
-    
+
     client.on('close', () => {
         console.log("TCP connection closed.");
     });

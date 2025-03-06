@@ -190,7 +190,7 @@ async function sendDataToTcpServer(payload) {
     }
 
     // 備援 TCP 傳輸
-    if (BACKUP_TCP_TEST === true) {
+    if (BACKUP_TCP_TEST === 'true') {
         sendBackupTcpData(payload, client);
     }
 }

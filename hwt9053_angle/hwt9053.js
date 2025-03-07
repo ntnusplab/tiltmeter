@@ -198,7 +198,7 @@ async function readBufferFile() {
 // 將傳入的 buffer 陣列寫回 JSON 檔案
 async function writeBufferFile(buffer) {
     try {
-        await fs.writeFile(bufferFilePath, JSON.stringify(buffer, null, 2));
+        await fs.promises.writeFile(bufferFilePath, JSON.stringify(buffer, null, 2));
     } catch (err) {
         console.error(`[${new Date().toISOString()}] Error writing to ${bufferFilePath}:`, err.message);
     }

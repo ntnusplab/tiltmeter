@@ -14,12 +14,12 @@ trap "echo 0 > ${LED_PATH}/brightness; exit" SIGINT SIGTERM
 
 # 定義 LED 常亮函數
 led_on() {
-    echo 1 > "${LED_PATH}/brightness"
+    echo 0 > "${LED_PATH}/brightness"
 }
 
 # 定義 LED 熄滅函數
 led_off() {
-    echo 0 > "${LED_PATH}/brightness"
+    echo 1 > "${LED_PATH}/brightness"
 }
 
 # 定義 LED 閃爍函數，參數 $1 為持續時間（秒）

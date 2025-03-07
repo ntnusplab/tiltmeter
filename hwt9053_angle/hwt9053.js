@@ -73,17 +73,14 @@ const dailyLogger = new DailyLogger();
 let lastSuccessTime = null;
 const bufferFilePath = path.join(__dirname, 'retryBuffer.json');
 
-// // 檔案名稱
-// const retryBufferFile = 'retryBuffer.json';
-
 // 初始化 retryBuffer，從檔案讀取，如果檔案不存在則建立空陣列
 let retryBuffer = [];
-if (fs.existsSync(retryBufferFile)) {
+if (fs.existsSync(bufferFilePath)) {
     try {
-        const data = fs.readFileSync(retryBufferFile, 'utf8');
+        const data = fs.readFileSync(bufferFilePath, 'utf8');
         retryBuffer = JSON.parse(data);
     } catch (e) {
-        console.error(`[${new Date().toISOString()}] Error reading ${retryBufferFile}:`, e);
+        console.error(`[${new Date().toISOString()}] Error reading ${bufferFilePath}:`, e);
         retryBuffer = [];
     }
 }

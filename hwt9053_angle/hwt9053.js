@@ -5,6 +5,7 @@ const { getCpuTemperature, getCpuVoltage, getRssi, getMemoryUsagePercentage, get
 const DailyLogger = require('./dailyLogger'); // 引入日誌模組
 const net = require('net');
 const path = require('path');
+const fs = require('fs');
 
 // 從環境變數讀取 API URL 與其他設定
 const API_URL = process.env.API_URL;

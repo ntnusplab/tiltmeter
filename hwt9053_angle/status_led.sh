@@ -42,6 +42,6 @@ while true; do
         sleep 5
     else
         # 當 ping 失敗時，讓 LED 閃爍 60 秒
-        led_blink 60
+        led_blink 5
     fi
 done

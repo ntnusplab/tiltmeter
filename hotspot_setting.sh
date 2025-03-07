@@ -51,11 +51,12 @@ else
         ssid "$SSID" \
         802-11-wireless.mode ap \
         802-11-wireless.band bg \
-        ipv4.method shared ipv4.address 192.168.2.1/24 \
+        ipv4.method shared ipv4.address 192.168.2.1/24 ipv4.dns "8.8.8.8 8.8.4.4" \
         wifi-sec.key-mgmt wpa-psk \
         wifi-sec.pairwise ccmp \
         wifi-sec.proto rsn \
         wifi-sec.psk "$PSK"
+
 fi
 
 # 啟動接入點連線

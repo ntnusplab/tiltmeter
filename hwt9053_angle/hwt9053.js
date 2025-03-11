@@ -10,7 +10,7 @@ const fs = require('fs');
 // 從環境變數讀取 API URL 與其他設定
 const API_URL = process.env.API_URL;
 const DEVICE_ID = process.env.DEVICE_ID;
-const ANGLE_DIFFERENT_THERSHOLD = process.env.ANGLE_DIFFERENT_THERSHOLD;
+// const ANGLE_DIFFERENT_THERSHOLD = process.env.ANGLE_DIFFERENT_THERSHOLD;
 const BACKUP_TCP_HOST = process.env.BACKUP_TCP_HOST;
 const BACKUP_TCP_PORT = process.env.BACKUP_TCP_PORT;
 const BACKUP_TCP_TEST = process.env.BACKUP_TCP_TEST;
@@ -32,10 +32,10 @@ if (DEVICE_ID === "tiltmeter_default") {
     process.exit(1);
 }
 
-if (!ANGLE_DIFFERENT_THERSHOLD) {
-    console.error('Error: ANGLE_DIFFERENT_THERSHOLD is not defined in the .env file.');
-    process.exit(1);
-}
+// if (!ANGLE_DIFFERENT_THERSHOLD) {
+//     console.error('Error: ANGLE_DIFFERENT_THERSHOLD is not defined in the .env file.');
+//     process.exit(1);
+// }
 
 if (!BACKUP_TCP_HOST) {
     console.error('Error: BACKUP_TCP_HOST is not defined in the .env file.');

@@ -2,9 +2,11 @@
 # 設定 LED 的 sysfs 路徑為 ACT（請根據你的 PI 型號確認）
 LED_PATH="/sys/class/leds/ACT"
 
-# 設定要 ping 的 IP 位址
-IP="tilt.smartiout.com"
-PORT="443"
+# # 設定要 ping 的 IP 位址
+# IP="tilt.smartiout.com"
+# PORT="443"
+
+source ../sys.conf
 
 # 將 LED trigger 設為 none，以便手動控制 LED
 echo none > "${LED_PATH}/trigger"

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>編輯設定變數與連線狀況</title>
+  <style>
+    .config-item {
+      margin-bottom: 10px;
+    }
+    .config-key {
+      display: inline-block;
+      width: 200px;
+      font-weight: bold;
+    }
+    .config-value {
+      width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <h1>登入</h1>
+  <div id="loginDiv">
+    <input type="text" id="username" placeholder="帳號">
+    <input type="password" id="password" placeholder="密碼">
+    <button id="loginButton">登入</button>
+    <p id="loginMessage" style="color:red;"></p>
+  </div>
+  
+  <div id="configEditor" style="display:none;">
+    <h2>編輯設定變數</h2>
+    <div id="configContainer"></div>
+    <br>
+    <button id="updateConfigBtn">更新設定檔</button>
+    <p id="updateMessage"></p>
+    
+    <hr>
+    <h2>網際網路連線狀況</h2>
+    <p id="connectionStatus">讀取中...</p>
+    <button id="refreshConnectionBtn">手動刷新</button>
+  </div>
+  
+  <script src="script.js"></script>
+</body>
+</html>

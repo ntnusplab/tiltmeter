@@ -11,7 +11,12 @@
   "dependencies": {
     "@serialport/parser-readline": "^13.0.0",
     "axios": "^1.7.9",
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
     "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "javascript-obfuscator": "^4.1.1",
     "serialport": "^13.0.0"
   }
 }

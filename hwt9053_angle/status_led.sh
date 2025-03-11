@@ -36,7 +36,7 @@ led_blink() {
 
 # 主迴圈：每隔 1 分鐘執行一次 ping 指令，根據結果切換 LED 模式
 while true; do
-    if nc -z -v -w "$IP" "$PORT" > /dev/null 2>&1; then
+    if nc -z -v "$IP" "$PORT" > /dev/null 2>&1; then
         # 當 ping 成功時，讓 LED 常亮 5 秒
         led_on
         sleep 5

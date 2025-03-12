@@ -72,7 +72,6 @@ const dailyLogger = new DailyLogger();
 // 用來記錄上次成功傳輸的 payload.sensing_time，初始為 null
 const bufferFilePath = path.join(__dirname, 'retryBuffer.json');
 
-// 初始化 retryBuffer，從檔案讀取，如果檔案不存在則建立空陣列
 let retryBuffer = [];
 if (fs.existsSync(bufferFilePath)) {
     try {
@@ -82,6 +81,10 @@ if (fs.existsSync(bufferFilePath)) {
         console.error(`[${new Date().toISOString()}] Error reading ${bufferFilePath}:`, e);
         retryBuffer = [];
     }
+} else {
+    // 檔案不存在時建立一個空的 retryBuffer.json
+    fs.writeFileSync(bufferFilePath, '[]', 'utf8');
+    retryBuffer = [];
 }
 
 function syncTimeAndSchedule() {

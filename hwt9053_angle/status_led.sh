@@ -6,7 +6,7 @@ LED_PATH="/sys/class/leds/ACT"
 # IP="tilt.smartiout.com"
 # PORT="443"
 
-source ../sys.conf
+source /home/admin/tiltmeter/sys.conf
 
 # 將 LED trigger 設為 none，以便手動控制 LED
 echo none > "${LED_PATH}/trigger"

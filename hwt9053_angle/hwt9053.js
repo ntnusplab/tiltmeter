@@ -70,7 +70,6 @@ let dataBuffer = Buffer.alloc(0);
 
 const dailyLogger = new DailyLogger();
 // 用來記錄上次成功傳輸的 payload.sensing_time，初始為 null
-let lastSuccessTime = null;
 const bufferFilePath = path.join(__dirname, 'retryBuffer.json');
 
 // 初始化 retryBuffer，從檔案讀取，如果檔案不存在則建立空陣列
@@ -219,7 +218,6 @@ async function sendDataToTcpServer(payload) {
         // 嘗試發送新的 payload
         await axios.post(API_URL, payload);
         console.log(`[${new Date().toISOString()}] Sent to API_URL successfully.`);
-        lastSuccessTime = payload.sensing_time; // 更新成功時間
 
         // 發送成功後，嘗試從 JSON 檔案中補傳資料
         await resendBufferedData();
@@ -234,30 +232,29 @@ async function sendDataToTcpServer(payload) {
         sendBackupTcpData(payload, client);
     }
 }
-
-// 補傳 JSON 檔案內的資料
 async function resendBufferedData() {
-    const buffer = await readBufferFile();
+    let buffer = await readBufferFile();
     if (buffer.length === 0) return;
 
     console.log(`[${new Date().toISOString()}] Found ${buffer.length} buffered entries to resend.`);
 
-    // 建立一個新的陣列，存放尚未成功傳送的資料
-    const newBuffer = [];
-    for (const entry of buffer) {
+    while (buffer.length > 0) {
+        const entry = buffer.pop(); // 每次從 buffer 取出最後一筆資料
         try {
             await axios.post(API_URL, entry);
             console.log(`[${new Date().toISOString()}] Resent entry from ${entry.sensing_time} successfully.`);
-        } catch (resendError) {
-            console.error(`[${new Date().toISOString()}] Failed to resend entry from ${entry.sensing_time}:`, resendError.message);
-            // 補傳失敗則保留該筆資料
-            newBuffer.push(entry);
-            // 可選：如果希望中斷後續傳送，可在此處 break; 不過此範例會嘗試全部傳送
+        } catch (error) {
+            console.error(`[${new Date().toISOString()}] Failed to resend entry from ${entry.sensing_time}:`, error.message);
+            // 若傳送失敗，將該筆資料補回 buffer，然後中斷迴圈
+            buffer.push(entry);
+            break;
         }
     }
-    // 將尚未成功的資料重新寫回 JSON 檔案
-    await writeBufferFile(newBuffer);
+
+    // 將尚未成功傳送的資料寫回 JSON 檔案
+    await writeBufferFile(buffer);
 }
+
 
 function sendBackupTcpData(payload, client) {
     client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {

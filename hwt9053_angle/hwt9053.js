@@ -186,7 +186,7 @@ port.on('data', async (inputData) => {
 // 讀取 JSON 檔案中的 buffer，若檔案不存在則回傳空陣列
 async function readBufferFile() {
     try {
-        const data = await fs.readFile(bufferFilePath, 'utf8');
+        const data = await fs.promises.readFile(bufferFilePath, 'utf8');
         return JSON.parse(data);
     } catch (err) {
         // 若檔案不存在或讀取失敗，則返回空陣列

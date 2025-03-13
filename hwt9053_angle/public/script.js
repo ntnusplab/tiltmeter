@@ -84,13 +84,18 @@ document.getElementById('updateConfigBtn').addEventListener('click', function(){
   .catch(err => console.error('Error:', err));
 });
 
-// 檢查網際網路連線狀況的函數
 function checkConnectionStatus() {
   fetch('/connection-status')
     .then(res => res.json())
     .then(data => {
       const statusEl = document.getElementById('connectionStatus');
-      statusEl.innerText = data.message;
+      // 取得連線訊息
+      let text = data.message;
+      // 若有取得 wwan0 的 IP，則附加在訊息後面
+      if (data.wwan0IP) {
+        text += " (wwan0 IP: " + data.wwan0IP + ")";
+      }
+      statusEl.innerText = text;
       statusEl.style.color = data.connected ? 'green' : 'red';
     })
     .catch(err => {
@@ -99,6 +104,7 @@ function checkConnectionStatus() {
       document.getElementById('connectionStatus').style.color = 'red';
     });
 }
+
 
 // 每分鐘自動刷新網際網路連線狀況
 setInterval(checkConnectionStatus, 60000);

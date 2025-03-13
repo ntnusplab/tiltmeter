@@ -5,5 +5,5 @@ hwt9053_angle/node_modules
 hwt9053_angle/env*
 圖檔
 config.json
-mbim.md
-Status_led.md
+mbim.service.txt
+Status_led.service.txt

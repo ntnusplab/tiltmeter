@@ -4,6 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const { exec } = require('child_process');
 const app = express();
+const http = require('http');
+const server = http.createServer(app);
+const io = require('socket.io')(server); // 引入 socket.io
 const PORT = 8080;
 
 // 檔案路徑：sys.conf 位於上一層；.env 與 .config.json 位於本層
@@ -143,7 +146,6 @@ app.get('/connection-status', (req, res) => {
             return res.json({ connected: false, message: 'sys.conf 中未設定 IP 或 PORT', wwan0IP });
         }
         exec(`nc -z -v ${IP} ${PORT}`, (error, stdout, stderr) => {
-            // exec(`ping ${IP}`, (error, stdout, stderr) => {
             if (error) {
                 return res.json({ connected: false, message: '網際網路連線中斷', wwan0IP });
             }
@@ -152,7 +154,49 @@ app.get('/connection-status', (req, res) => {
     });
 });
 
+// 初次讀取 sys.conf 的設定
+let lastSysConfig = {};
+if (fs.existsSync(sysConfPath)) {
+    const sysContent = fs.readFileSync(sysConfPath, 'utf8');
+    lastSysConfig = parseConfig(sysContent);
+}
 
-app.listen(PORT, () => {
+// 監控 sys.conf 檔案的變化，interval 可調整檢查頻率（單位：毫秒）
+fs.watchFile(sysConfPath, { interval: 1000 }, (curr, prev) => {
+    if (curr.mtimeMs !== prev.mtimeMs) {
+        const newContent = fs.readFileSync(sysConfPath, 'utf8');
+        const newConfig = parseConfig(newContent);
+
+        // 若 APN 改變，執行 sudo systemctl restart mbim_start_connect.service
+        if (newConfig['APN'] !== lastSysConfig['APN']) {
+            console.log(`APN 變更：舊值 = ${lastSysConfig['APN']}, 新值 = ${newConfig['APN']}`);
+            exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
+                if (error) {
+                    console.error('Restart mbim_start_connect.service 失敗:', error);
+                } else {
+                    console.log('mbim_start_connect.service 已成功重啟');
+                }
+            });
+        }
+
+        // 若 IP 或 PORT 改變，執行 sudo pm2 restart 1
+        if (newConfig['IP'] !== lastSysConfig['IP'] || newConfig['PORT'] !== lastSysConfig['PORT']) {
+            console.log(`IP 或 PORT 變更：舊 IP = ${lastSysConfig['IP']}, 新 IP = ${newConfig['IP']}`);
+            console.log(`舊 PORT = ${lastSysConfig['PORT']}, 新 PORT = ${newConfig['PORT']}`);
+            exec('sudo pm2 restart 1', (error, stdout, stderr) => {
+                if (error) {
+                    console.error('Restart pm2 process 1 失敗:', error);
+                } else {
+                    console.log('pm2 process 1 已成功重啟');
+                }
+            });
+        }
+
+        // 更新目前的設定值
+        lastSysConfig = newConfig;
+    }
+});
+
+server.listen(PORT, () => {
     console.log(`伺服器已啟動，請訪問 http://localhost:${PORT}`);
 });

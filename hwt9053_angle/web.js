@@ -6,13 +6,7 @@ const { exec } = require('child_process');
 const app = express();
 const http = require('http');
 const server = http.createServer(app);
-const io = require('socket.io')(server);
 const PORT = 8080;
-
-// 檔案路徑：sys.conf 位於上一層；.env 與 .config.json 位於本層
-const sysConfPath = path.join(__dirname, '..', 'sys.conf');
-const envPath = path.join(__dirname, '.env');
-const combinedConfigPath = path.join(__dirname, '.config.json');
 
 app.use(express.static('public'));
 app.use(bodyParser.json());
@@ -28,6 +22,11 @@ app.post('/login', (req, res) => {
     res.json({ success: false, message: '帳號或密碼錯誤' });
   }
 });
+
+// 檔案路徑：sys.conf 位於上一層；.env 與 .config.json 位於本層
+const sysConfPath = path.join(__dirname, '..', 'sys.conf');
+const envPath = path.join(__dirname, '.env');
+const combinedConfigPath = path.join(__dirname, '.config.json');
 
 // 輔助函數：解析 key=value 格式的文字
 function parseConfig(content) {
@@ -116,8 +115,6 @@ app.post('/update-all-config', (req, res) => {
   for (let key in configData) {
     if (sysConfig.hasOwnProperty(key)) {
       sysConfig[key] = configData[key];
-    } else if (envConfig.hasOwnProperty(key)) {
-      envConfig[key] = configData[key];
     } else {
       envConfig[key] = configData[key];
     }
@@ -154,84 +151,7 @@ app.get('/connection-status', (req, res) => {
   });
 });
 
-// ----------------------------
-// 以下為 sys.conf 變更偵測與確認處理
-// ----------------------------
-
-// 初次讀取 sys.conf 的設定
-let lastSysConfig = {};
-if (fs.existsSync(sysConfPath)) {
-  const sysContent = fs.readFileSync(sysConfPath, 'utf8');
-  lastSysConfig = parseConfig(sysContent);
-}
-
-// 用來儲存待確認的變更
-let pendingConfirmation = false;
-let pendingConfigChange = null;
-
-// 監控 sys.conf 檔案變化
-fs.watchFile(sysConfPath, { interval: 1000 }, (curr, prev) => {
-  if (curr.mtimeMs !== prev.mtimeMs && !pendingConfirmation) {
-    const newContent = fs.readFileSync(sysConfPath, 'utf8');
-    const newConfig = parseConfig(newContent);
-    let actions = {};
-
-    // 檢查 APN 是否改變
-    if (newConfig['APN'] !== lastSysConfig['APN']) {
-      actions['APN'] = { old: lastSysConfig['APN'], new: newConfig['APN'], command: 'sudo systemctl restart mbim_start_connect.service' };
-    }
-    // 檢查 IP 與 PORT 是否改變
-    if (newConfig['IP'] !== lastSysConfig['IP'] || newConfig['PORT'] !== lastSysConfig['PORT']) {
-      actions['IP_PORT'] = {
-        oldIP: lastSysConfig['IP'], newIP: newConfig['IP'],
-        oldPORT: lastSysConfig['PORT'], newPORT: newConfig['PORT'],
-        command: 'sudo pm2 restart 1'
-      };
-    }
-
-    if (Object.keys(actions).length > 0) {
-      pendingConfirmation = true;
-      pendingConfigChange = newConfig;
-      // 將變更通知給所有連線的前端
-      io.emit('sysConfChanged', { actions: actions });
-    }
-  }
-});
-
-// 當前端回覆確認後，根據結果決定是否執行命令
-io.on('connection', (socket) => {
-  socket.on('confirmSysConfChange', (data) => {
-    if (data.confirmed && pendingConfigChange) {
-      // 執行 APN 變更的命令
-      if (pendingConfigChange['APN'] !== lastSysConfig['APN']) {
-        exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
-          if (error) {
-            console.error('Restart mbim_start_connect.service 失敗:', error);
-          } else {
-            console.log('mbim_start_connect.service 已成功重啟');
-          }
-        });
-      }
-      // 執行 IP 或 PORT 變更的命令
-      if (pendingConfigChange['IP'] !== lastSysConfig['IP'] || pendingConfigChange['PORT'] !== lastSysConfig['PORT']) {
-        exec('sudo pm2 restart 1', (error, stdout, stderr) => {
-          if (error) {
-            console.error('Restart pm2 process 1 失敗:', error);
-          } else {
-            console.log('pm2 process 1 已成功重啟');
-          }
-        });
-      }
-      // 更新目前狀態
-      lastSysConfig = pendingConfigChange;
-    } else {
-      console.log('使用者取消執行 sys.conf 變更命令');
-    }
-    pendingConfirmation = false;
-    pendingConfigChange = null;
-  });
-});
-
+// 啟動伺服器
 server.listen(PORT, () => {
   console.log(`伺服器已啟動，請訪問 http://localhost:${PORT}`);
 });

@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-
 <head>
   <meta charset="UTF-8">
   <title>編輯設定變數與連線狀況</title>
@@ -8,19 +7,16 @@
     .config-item {
       margin-bottom: 10px;
     }
-
     .config-key {
       display: inline-block;
       width: 200px;
       font-weight: bold;
     }
-
     .config-value {
       width: 300px;
     }
   </style>
 </head>
-
 <body>
   <h1>登入</h1>
   <div id="loginDiv">
@@ -44,17 +40,5 @@
   </div>
 
   <script src="script.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
-    socket.on('sysConfChanged', function (data) {
-      if (confirm(data.message)) {
-        // 使用者按下「確認」後，可根據需求觸發重新啟動流程，例如呼叫後端 API 或直接重新載入頁面
-        // 這裡示範重新載入頁面
-        location.reload();
-      }
-    });
-  </script>
 </body>
-
 </html>

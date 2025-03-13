@@ -89,9 +89,7 @@ function checkConnectionStatus() {
     .then(res => res.json())
     .then(data => {
       const statusEl = document.getElementById('connectionStatus');
-      // 取得連線訊息
       let text = data.message;
-      // 若有取得 wwan0 的 IP，則附加在訊息後面
       if (data.wwan0IP) {
         text += " (IP: " + data.wwan0IP + ")";
       }
@@ -105,9 +103,5 @@ function checkConnectionStatus() {
     });
 }
 
-
-// 每分鐘自動刷新網際網路連線狀況
 setInterval(checkConnectionStatus, 60000);
-
-// 手動刷新按鈕事件
 document.getElementById('refreshConnectionBtn').addEventListener('click', checkConnectionStatus);

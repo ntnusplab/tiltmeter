@@ -93,7 +93,7 @@ function checkConnectionStatus() {
       let text = data.message;
       // 若有取得 wwan0 的 IP，則附加在訊息後面
       if (data.wwan0IP) {
-        text += " (wwan0 IP: " + data.wwan0IP + ")";
+        text += " (IP: " + data.wwan0IP + ")";
       }
       statusEl.innerText = text;
       statusEl.style.color = data.connected ? 'green' : 'red';

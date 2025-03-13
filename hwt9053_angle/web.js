@@ -6,7 +6,7 @@ const { exec } = require('child_process');
 const app = express();
 const http = require('http');
 const server = http.createServer(app);
-const io = require('socket.io')(server); // 引入 socket.io
+const io = require('socket.io')(server);
 const PORT = 8080;
 
 // 檔案路徑：sys.conf 位於上一層；.env 與 .config.json 位於本層
@@ -21,182 +21,217 @@ app.use(bodyParser.urlencoded({ extended: true }));
 // 簡單的登入驗證（示範用）
 const user = { username: 'admin', password: 'password' };
 app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-    if (username === user.username && password === user.password) {
-        res.json({ success: true });
-    } else {
-        res.json({ success: false, message: '帳號或密碼錯誤' });
-    }
+  const { username, password } = req.body;
+  if (username === user.username && password === user.password) {
+    res.json({ success: true });
+  } else {
+    res.json({ success: false, message: '帳號或密碼錯誤' });
+  }
 });
 
 // 輔助函數：解析 key=value 格式的文字
 function parseConfig(content) {
-    const config = {};
-    content.split('\n').forEach(line => {
-        line = line.trim();
-        if (line && line.indexOf('=') !== -1 && line.charAt(0) !== '#') {
-            const parts = line.split('=');
-            const key = parts.shift().trim();
-            const value = parts.join('=').trim();
-            config[key] = value;
-        }
-    });
-    return config;
+  const config = {};
+  content.split('\n').forEach(line => {
+    line = line.trim();
+    if (line && line.indexOf('=') !== -1 && line.charAt(0) !== '#') {
+      const parts = line.split('=');
+      const key = parts.shift().trim();
+      const value = parts.join('=').trim();
+      config[key] = value;
+    }
+  });
+  return config;
 }
 
 // 輔助函數：將物件轉成 key=value 格式字串
 function generateConfigContent(configObj) {
-    let content = "";
-    for (const key in configObj) {
-        content += `${key}=${configObj[key]}\n`;
-    }
-    return content;
+  let content = "";
+  for (const key in configObj) {
+    content += `${key}=${configObj[key]}\n`;
+  }
+  return content;
 }
 
 // 產生扁平化設定：合併 sys.conf 與 .env
 function generateFlatConfig() {
-    let sysConfig = {};
-    let envConfig = {};
-    if (fs.existsSync(sysConfPath)) {
-        const sysContent = fs.readFileSync(sysConfPath, 'utf8');
-        sysConfig = parseConfig(sysContent);
-    }
-    if (fs.existsSync(envPath)) {
-        const envContent = fs.readFileSync(envPath, 'utf8');
-        envConfig = parseConfig(envContent);
-    }
-    // 假設兩邊的 key 不會重複
-    return { ...sysConfig, ...envConfig };
+  let sysConfig = {};
+  let envConfig = {};
+  if (fs.existsSync(sysConfPath)) {
+    const sysContent = fs.readFileSync(sysConfPath, 'utf8');
+    sysConfig = parseConfig(sysContent);
+  }
+  if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envConfig = parseConfig(envContent);
+  }
+  // 假設兩邊的 key 不會重複
+  return { ...sysConfig, ...envConfig };
 }
 
 // 更新隱藏的 .config.json 檔案
 function updateCombinedConfigFile(flatConfig) {
-    fs.writeFileSync(combinedConfigPath, JSON.stringify(flatConfig, null, 2), 'utf8');
+  fs.writeFileSync(combinedConfigPath, JSON.stringify(flatConfig, null, 2), 'utf8');
 }
 
 function getWWAN0IP(callback) {
-    exec('ip addr show wwan0', (error, stdout, stderr) => {
-        if (error) {
-            // 若指令執行錯誤，回傳 null
-            return callback(null);
-        }
-        // 使用正則表達式找出 "inet <IP>" 部分
-        const match = stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
-        if (match) {
-            callback(match[1]);
-        } else {
-            callback(null);
-        }
-    });
+  exec('ip addr show wwan0', (error, stdout, stderr) => {
+    if (error) {
+      // 若指令執行錯誤，回傳 null
+      return callback(null);
+    }
+    // 使用正則表達式找出 "inet <IP>" 部分
+    const match = stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
+    if (match) {
+      callback(match[1]);
+    } else {
+      callback(null);
+    }
+  });
 }
 
 // GET /config-json：回傳扁平化設定並更新 .config.json
 app.get('/config-json', (req, res) => {
-    const flatConfig = generateFlatConfig();
-    updateCombinedConfigFile(flatConfig);
-    res.json(flatConfig);
+  const flatConfig = generateFlatConfig();
+  updateCombinedConfigFile(flatConfig);
+  res.json(flatConfig);
 });
 
 // POST /update-all-config：接收 { configData }，依據每個 key 更新原始檔案
 app.post('/update-all-config', (req, res) => {
-    const { configData } = req.body;
-    if (!configData || typeof configData !== 'object') {
-        return res.status(400).json({ error: '未提供正確的 configData' });
+  const { configData } = req.body;
+  if (!configData || typeof configData !== 'object') {
+    return res.status(400).json({ error: '未提供正確的 configData' });
+  }
+  // 讀取原始檔案
+  let sysConfig = {};
+  let envConfig = {};
+  if (fs.existsSync(sysConfPath)) {
+    sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
+  }
+  if (fs.existsSync(envPath)) {
+    envConfig = parseConfig(fs.readFileSync(envPath, 'utf8'));
+  }
+  // 根據原本出現的檔案更新對應的 key；不存在則預設新增到 .env
+  for (let key in configData) {
+    if (sysConfig.hasOwnProperty(key)) {
+      sysConfig[key] = configData[key];
+    } else if (envConfig.hasOwnProperty(key)) {
+      envConfig[key] = configData[key];
+    } else {
+      envConfig[key] = configData[key];
     }
-    // 讀取原始檔案
-    let sysConfig = {};
-    let envConfig = {};
-    if (fs.existsSync(sysConfPath)) {
-        sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
-    }
-    if (fs.existsSync(envPath)) {
-        envConfig = parseConfig(fs.readFileSync(envPath, 'utf8'));
-    }
-    // 根據原本出現的檔案更新對應的 key；不存在則預設新增到 .env
-    for (let key in configData) {
-        if (sysConfig.hasOwnProperty(key)) {
-            sysConfig[key] = configData[key];
-        } else if (envConfig.hasOwnProperty(key)) {
-            envConfig[key] = configData[key];
-        } else {
-            envConfig[key] = configData[key];
-        }
-    }
-    fs.writeFileSync(sysConfPath, generateConfigContent(sysConfig), 'utf8');
-    fs.writeFileSync(envPath, generateConfigContent(envConfig), 'utf8');
+  }
+  fs.writeFileSync(sysConfPath, generateConfigContent(sysConfig), 'utf8');
+  fs.writeFileSync(envPath, generateConfigContent(envConfig), 'utf8');
 
-    const flatConfig = { ...sysConfig, ...envConfig };
-    updateCombinedConfigFile(flatConfig);
-    res.json({ success: true, message: '設定檔更新成功' });
+  const flatConfig = { ...sysConfig, ...envConfig };
+  updateCombinedConfigFile(flatConfig);
+  res.json({ success: true, message: '設定檔更新成功' });
 });
 
 // GET /connection-status：從 sys.conf 讀取 IP 與 PORT，執行 nc 指令檢查連線，並使用 exec 取得 wwan0 的 IP
 app.get('/connection-status', (req, res) => {
-    let sysConfig = {};
-    if (fs.existsSync(sysConfPath)) {
-        const content = fs.readFileSync(sysConfPath, 'utf8');
-        sysConfig = parseConfig(content);
-    }
-    const IP = sysConfig.IP;
-    const PORT = sysConfig.PORT;
+  let sysConfig = {};
+  if (fs.existsSync(sysConfPath)) {
+    const content = fs.readFileSync(sysConfPath, 'utf8');
+    sysConfig = parseConfig(content);
+  }
+  const IP = sysConfig.IP;
+  const PORT = sysConfig.PORT;
 
-    // 先取得 wwan0 的 IP
-    getWWAN0IP((wwan0IP) => {
-        if (!IP || !PORT) {
-            return res.json({ connected: false, message: 'sys.conf 中未設定 IP 或 PORT', wwan0IP });
-        }
-        exec(`nc -z -v ${IP} ${PORT}`, (error, stdout, stderr) => {
-            if (error) {
-                return res.json({ connected: false, message: '網際網路連線中斷', wwan0IP });
-            }
-            res.json({ connected: true, message: '網際網路連線正常', wwan0IP });
-        });
+  // 先取得 wwan0 的 IP
+  getWWAN0IP((wwan0IP) => {
+    if (!IP || !PORT) {
+      return res.json({ connected: false, message: 'sys.conf 中未設定 IP 或 PORT', wwan0IP });
+    }
+    exec(`nc -z -v ${IP} ${PORT}`, (error, stdout, stderr) => {
+      if (error) {
+        return res.json({ connected: false, message: '網際網路連線中斷', wwan0IP });
+      }
+      res.json({ connected: true, message: '網際網路連線正常', wwan0IP });
     });
+  });
 });
+
+// ----------------------------
+// 以下為 sys.conf 變更偵測與確認處理
+// ----------------------------
 
 // 初次讀取 sys.conf 的設定
 let lastSysConfig = {};
 if (fs.existsSync(sysConfPath)) {
-    const sysContent = fs.readFileSync(sysConfPath, 'utf8');
-    lastSysConfig = parseConfig(sysContent);
+  const sysContent = fs.readFileSync(sysConfPath, 'utf8');
+  lastSysConfig = parseConfig(sysContent);
 }
 
-// 監控 sys.conf 檔案的變化，interval 可調整檢查頻率（單位：毫秒）
+// 用來儲存待確認的變更
+let pendingConfirmation = false;
+let pendingConfigChange = null;
+
+// 監控 sys.conf 檔案變化
 fs.watchFile(sysConfPath, { interval: 1000 }, (curr, prev) => {
-    if (curr.mtimeMs !== prev.mtimeMs) {
-        const newContent = fs.readFileSync(sysConfPath, 'utf8');
-        const newConfig = parseConfig(newContent);
+  if (curr.mtimeMs !== prev.mtimeMs && !pendingConfirmation) {
+    const newContent = fs.readFileSync(sysConfPath, 'utf8');
+    const newConfig = parseConfig(newContent);
+    let actions = {};
 
-        // 若 APN 改變，執行 sudo systemctl restart mbim_start_connect.service
-        if (newConfig['APN'] !== lastSysConfig['APN']) {
-            console.log(`APN 變更：舊值 = ${lastSysConfig['APN']}, 新值 = ${newConfig['APN']}`);
-            exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Restart mbim_start_connect.service 失敗:', error);
-                } else {
-                    console.log('mbim_start_connect.service 已成功重啟');
-                }
-            });
-        }
-
-        // 若 IP 或 PORT 改變，執行 sudo pm2 restart 1
-        if (newConfig['IP'] !== lastSysConfig['IP'] || newConfig['PORT'] !== lastSysConfig['PORT']) {
-            console.log(`IP 或 PORT 變更：舊 IP = ${lastSysConfig['IP']}, 新 IP = ${newConfig['IP']}`);
-            console.log(`舊 PORT = ${lastSysConfig['PORT']}, 新 PORT = ${newConfig['PORT']}`);
-            exec('sudo pm2 restart 1', (error, stdout, stderr) => {
-                if (error) {
-                    console.error('Restart pm2 process 1 失敗:', error);
-                } else {
-                    console.log('pm2 process 1 已成功重啟');
-                }
-            });
-        }
-
-        // 更新目前的設定值
-        lastSysConfig = newConfig;
+    // 檢查 APN 是否改變
+    if (newConfig['APN'] !== lastSysConfig['APN']) {
+      actions['APN'] = { old: lastSysConfig['APN'], new: newConfig['APN'], command: 'sudo systemctl restart mbim_start_connect.service' };
     }
+    // 檢查 IP 與 PORT 是否改變
+    if (newConfig['IP'] !== lastSysConfig['IP'] || newConfig['PORT'] !== lastSysConfig['PORT']) {
+      actions['IP_PORT'] = {
+        oldIP: lastSysConfig['IP'], newIP: newConfig['IP'],
+        oldPORT: lastSysConfig['PORT'], newPORT: newConfig['PORT'],
+        command: 'sudo pm2 restart 1'
+      };
+    }
+
+    if (Object.keys(actions).length > 0) {
+      pendingConfirmation = true;
+      pendingConfigChange = newConfig;
+      // 將變更通知給所有連線的前端
+      io.emit('sysConfChanged', { actions: actions });
+    }
+  }
+});
+
+// 當前端回覆確認後，根據結果決定是否執行命令
+io.on('connection', (socket) => {
+  socket.on('confirmSysConfChange', (data) => {
+    if (data.confirmed && pendingConfigChange) {
+      // 執行 APN 變更的命令
+      if (pendingConfigChange['APN'] !== lastSysConfig['APN']) {
+        exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
+          if (error) {
+            console.error('Restart mbim_start_connect.service 失敗:', error);
+          } else {
+            console.log('mbim_start_connect.service 已成功重啟');
+          }
+        });
+      }
+      // 執行 IP 或 PORT 變更的命令
+      if (pendingConfigChange['IP'] !== lastSysConfig['IP'] || pendingConfigChange['PORT'] !== lastSysConfig['PORT']) {
+        exec('sudo pm2 restart 1', (error, stdout, stderr) => {
+          if (error) {
+            console.error('Restart pm2 process 1 失敗:', error);
+          } else {
+            console.log('pm2 process 1 已成功重啟');
+          }
+        });
+      }
+      // 更新目前狀態
+      lastSysConfig = pendingConfigChange;
+    } else {
+      console.log('使用者取消執行 sys.conf 變更命令');
+    }
+    pendingConfirmation = false;
+    pendingConfigChange = null;
+  });
 });
 
 server.listen(PORT, () => {
-    console.log(`伺服器已啟動，請訪問 http://localhost:${PORT}`);
+  console.log(`伺服器已啟動，請訪問 http://localhost:${PORT}`);
 });

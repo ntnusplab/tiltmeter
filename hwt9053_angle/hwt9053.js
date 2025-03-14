@@ -65,7 +65,8 @@ if (!SERIALPORT_PATH) {
 const READ_ACCELERATION_COMMAND = Buffer.from([0x50, 0x03, 0x00, 0x3D, 0x00, 0x06, 0x59, 0x85]);
 let startTime = Date.now(); // 當前絕對時間，毫秒
 let startHrtime = process.hrtime.bigint(); // 高精度時間，納秒
-let startDay = new Date(startTime).toISOString().split('T')[0]; // 當前日期字串
+// let startDay = new Date(startTime).toISOString().split('T')[0]; // 當前日期字串
+let isResending = false;
 let dataBuffer = Buffer.alloc(0);
 
 const dailyLogger = new DailyLogger();
@@ -235,27 +236,37 @@ async function sendDataToTcpServer(payload) {
         sendBackupTcpData(payload, client);
     }
 }
+
 async function resendBufferedData() {
-    let buffer = await readBufferFile();
-    if (buffer.length === 0) return;
-
-    console.log(`[${new Date().toISOString()}] Found ${buffer.length} buffered entries to resend.`);
-
-    while (buffer.length > 0) {
-        const entry = buffer.pop(); // 每次從 buffer 取出最後一筆資料
-        try {
-            await axios.post(API_URL, entry);
-            console.log(`[${new Date().toISOString()}] Resent entry from ${entry.sensing_time} successfully.`);
-        } catch (error) {
-            console.error(`[${new Date().toISOString()}] Failed to resend entry from ${entry.sensing_time}:`, error.message);
-            // 若傳送失敗，將該筆資料補回 buffer，然後中斷迴圈
-            buffer.push(entry);
-            break;
-        }
+    if (isResending) {
+        console.log(`[${new Date().toISOString()}] Resending is already in progress. Skipping duplicate call.`);
+        return;
     }
+    isResending = true;
+    try {
+        let buffer = await readBufferFile();
+        if (buffer.length === 0) return;
 
-    // 將尚未成功傳送的資料寫回 JSON 檔案
-    await writeBufferFile(buffer);
+        console.log(`[${new Date().toISOString()}] Found ${buffer.length} buffered entries to resend.`);
+
+        while (buffer.length > 0) {
+            const entry = buffer.pop(); // 每次從 buffer 取出最後一筆資料
+            try {
+                await axios.post(API_URL, entry);
+                console.log(`[${new Date().toISOString()}] Resent entry from ${entry.sensing_time} successfully.`);
+            } catch (error) {
+                console.error(`[${new Date().toISOString()}] Failed to resend entry from ${entry.sensing_time}:`, error.message);
+                // 若傳送失敗，將該筆資料補回 buffer，然後中斷迴圈
+                buffer.push(entry);
+                break;
+            }
+        }
+
+        // 將尚未成功傳送的資料寫回 JSON 檔案
+        await writeBufferFile(buffer);
+    } finally {
+        isResending = false;
+    }
 }
 
 

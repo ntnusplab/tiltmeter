@@ -1,27 +1,40 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
   <meta charset="UTF-8">
   <title>編輯設定變數與連線狀況</title>
 
   <!-- 使用本機 Bootstrap CSS -->
   <link href="/bootstrap/css/bootstrap.min.css" rel="stylesheet">
-  
+
   <!-- 使用本機 Bootstrap Icons CSS -->
   <link href="/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet">
-  
+
   <!-- 使用本機 FontAwesome CSS -->
   <link href="/fontawesome/css/all.min.css" rel="stylesheet">
-  
+
   <style>
     .config-item {
       margin-bottom: 10px;
     }
+
     .config-key {
       font-weight: bold;
     }
+
+    .selected-value-field {
+      width: 300px;
+      /* 設定寬度 */
+      padding: 5px;
+      /* 內邊距 */
+      margin-left: 10px;
+      /* 與下拉選單間距 */
+      /* 可根據需求增加其他樣式，例如邊框、字體大小、背景色等 */
+    }
   </style>
 </head>
+
 <body>
   <div class="container mt-5">
     <h1 class="mb-4">
@@ -62,12 +75,13 @@
       </button>
     </div>
   </div>
-  
+
   <!-- 你的 script.js （若有 socket.io 也可以放這裡） -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="script.js"></script>
-  
+
   <!-- 使用本機 Bootstrap JS (含 Popper) -->
   <script src="/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

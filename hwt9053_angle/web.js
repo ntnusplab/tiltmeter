@@ -13,7 +13,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // 簡單的登入驗證（示範用）
-const user = { username: 'admin', password: 'password' };
+const user = { username: 'admin', password: '28579684' };
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === user.username && password === user.password) {

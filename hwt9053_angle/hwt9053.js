@@ -14,7 +14,7 @@ const DEVICE_ID = process.env.DEVICE_ID;
 const BACKUP_TCP_HOST = process.env.BACKUP_TCP_HOST;
 const BACKUP_TCP_PORT = process.env.BACKUP_TCP_PORT;
 const BACKUP_TCP_TEST = process.env.BACKUP_TCP_TEST;
-const SAMPLE_RATE = process.env.SAMPLE_RATE;
+const SAMPLE_RATE = process.env.SAMPLE_RATE/1000; //單位從微秒轉換成秒
 const SERIALPORT_PATH = process.env.SERIALPORT_PATH;
 
 if (!API_URL) {

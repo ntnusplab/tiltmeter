@@ -94,7 +94,7 @@ function populateConfigControls(configJson, controlConfig) {
       input.className = 'config-value';
       input.type = 'text';
       input.value = configJson[item.key] || '';
-      input.dataset.key = item.key;
+      input.dataset.key = item.value;
       div.appendChild(input);
       // 為每個可修改項目增加一個修改按鈕
       const btn = document.createElement('button');

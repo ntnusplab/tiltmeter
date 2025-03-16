@@ -5,6 +5,7 @@ const dropdownConfig = {
   hiddenKeys: ['SERIALPORT_PATH', 'BACKUP_TCP_TEST', 'API_URL'],
   readOnlyKeys: ['DEVICE_ID'],
   options: [
+    { key: 'APN', label: 'APN' },
     { key: 'API_URL', label: '後端資料API位置' },
     { key: 'BACKUP_TCP_HOST', label: '備份TCP傳輸IP地址' },
     { key: 'BACKUP_TCP_PORT', label: '備份TCP傳輸PORT' },

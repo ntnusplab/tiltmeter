@@ -149,6 +149,17 @@ app.post('/restart_network', (req, res) => {
   });
 });
 
+// 新增 API：POST /restart_sensor 來重啟感測器
+app.post('/restart_sensor', (req, res) => {
+  exec('sudo pm2 restart tiltmeter', (error, stdout, stderr) => {
+    if (error) {
+      console.error(`restart sensor error: ${error}`);
+      return res.json({ success: false, message: `重啟感測器失敗：${error.message}` });
+    }
+    res.json({ success: true, message: '感測器已重啟' });
+  });
+});
+
 server.listen(PORT, () => {
   console.log(`伺服器已啟動，請訪問 http://localhost:${PORT}`);
 });

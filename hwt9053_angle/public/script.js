@@ -178,7 +178,6 @@ document.getElementById('restartNetworkBtn').addEventListener('click', function 
       .catch(err => console.error('Error:', err));
   }
 });
-
 // 新增重啟感測器按鈕事件
 document.getElementById('restartSensorBtn').addEventListener('click', function () {
   if (confirm("確認要重啟感測器嗎？")) {

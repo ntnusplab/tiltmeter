@@ -152,7 +152,7 @@ document.getElementById('refreshConnectionBtn').addEventListener('click', checkC
 document.getElementById('refreshConfigBtn').addEventListener('click', loadConfig);
 
 // 新增重新開機按鈕事件，呼叫 /restart_tiltmeter API
-document.getElementById('restartWebsiteBtn').addEventListener('click', function () {
+document.getElementById('restartTiltmeterBtn').addEventListener('click', function () {
   if (confirm("確認要重新開機系統嗎？")) {
     fetch('/restart_tiltmeter', {
       method: 'POST'

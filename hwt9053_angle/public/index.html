@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
+
 <head>
   <meta charset="UTF-8">
   <title>編輯設定變數與連線狀況</title>
@@ -13,12 +14,15 @@
     .config-item {
       margin-bottom: 10px;
     }
+
     .config-key {
       font-weight: bold;
     }
+
     #configDropdown {
       height: 40px;
     }
+
     #selectedValueField {
       height: 40px;
       width: 300px;
@@ -27,6 +31,7 @@
     }
   </style>
 </head>
+
 <body>
   <div class="container mt-5">
     <h1 class="mb-4"><i class="fa-solid fa-right-to-bracket"></i> 登入</h1>
@@ -44,7 +49,6 @@
       </button>
       <p id="loginMessage" class="text-danger mt-2"></p>
     </div>
-
     <div id="configEditor" style="display:none;">
       <h2 class="mb-4"><i class="fa-solid fa-gear"></i> 編輯設定變數</h2>
       <!-- 刷新設定顯示按鈕 -->
@@ -58,8 +62,8 @@
       <button id="refreshConnectionBtn" class="btn btn-secondary">
         <i class="fa-solid fa-arrows-rotate"></i> 手動刷新
       </button>
-      <!-- 新增重新開機按鈕 -->
-      <button id="restartWebsiteBtn" class="btn btn-danger mt-3">
+      <!-- 新增重新開機按鈕，這裡我們將 id 改為 restartTiltmeterBtn -->
+      <button id="restartTiltmeterBtn" class="btn btn-danger mt-3">
         <i class="fa-solid fa-power-off"></i> 重新開機
       </button>
     </div>
@@ -71,4 +75,5 @@
   <!-- 本機 Bootstrap JS (含 Popper) -->
   <script src="/bootstrap/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>

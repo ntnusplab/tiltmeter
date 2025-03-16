@@ -138,6 +138,17 @@ app.get('/connection-status', (req, res) => {
   });
 });
 
+// 新增 API：POST /restart_network 來重新連線網路
+app.post('/restart_network', (req, res) => {
+  exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
+    if (error) {
+      console.error(`restart network error: ${error}`);
+      return res.json({ success: false, message: `網路重新連線失敗：${error.message}` });
+    }
+    res.json({ success: true, message: '網路已重新連線' });
+  });
+});
+
 server.listen(PORT, () => {
   console.log(`伺服器已啟動，請訪問 http://localhost:${PORT}`);
 });

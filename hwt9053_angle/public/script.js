@@ -17,7 +17,7 @@ const dropdownConfig = {
 
 // 登入功能：點擊按鈕或在密碼欄按 Enter 時觸發
 document.getElementById('loginButton').addEventListener('click', login);
-document.getElementById('password').addEventListener('keyup', function(e) {
+document.getElementById('password').addEventListener('keyup', function (e) {
   if (e.key === 'Enter') login();
 });
 
@@ -29,18 +29,18 @@ function login() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   })
-  .then(res => res.json())
-  .then(data => {
-    if (data.success) {
-      document.getElementById('loginDiv').style.display = 'none';
-      document.getElementById('configEditor').style.display = 'block';
-      loadConfig();
-      checkConnectionStatus();
-    } else {
-      document.getElementById('loginMessage').innerText = data.message || '登入失敗';
-    }
-  })
-  .catch(err => console.error('Error:', err));
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById('loginDiv').style.display = 'none';
+        document.getElementById('configEditor').style.display = 'block';
+        loadConfig();
+        checkConnectionStatus();
+      } else {
+        document.getElementById('loginMessage').innerText = data.message || '登入失敗';
+      }
+    })
+    .catch(err => console.error('Error:', err));
 }
 
 // 讀取後端設定資料，並整合 sys 與 env（若同一 key 同時存在，以 sys 優先）
@@ -119,12 +119,12 @@ function updateConfig(key, value) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value })
   })
-  .then(res => res.json())
-  .then(data => {
-    alert(data.message || '更新成功');
-    loadConfig();
-  })
-  .catch(err => console.error('Error:', err));
+    .then(res => res.json())
+    .then(data => {
+      alert(data.message || '更新成功');
+      loadConfig();
+    })
+    .catch(err => console.error('Error:', err));
 }
 
 // 檢查網際網路連線狀況
@@ -155,6 +155,20 @@ document.getElementById('refreshConfigBtn').addEventListener('click', loadConfig
 document.getElementById('restartTiltmeterBtn').addEventListener('click', function () {
   if (confirm("確認要重新開機系統嗎？")) {
     fetch('/restart_tiltmeter', {
+      method: 'POST'
+    })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+      })
+      .catch(err => console.error('Error:', err));
+  }
+});
+
+// 新增重新連線網路按鈕事件
+document.getElementById('restartNetworkBtn').addEventListener('click', function () {
+  if (confirm("確認要重新連線網路嗎？")) {
+    fetch('/restart_network', {
       method: 'POST'
     })
       .then(res => res.json())

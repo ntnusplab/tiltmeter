@@ -81,7 +81,7 @@ function populateConfigControls(configJson, controlConfig) {
     div.className = 'config-item';
     const label = document.createElement('span');
     label.className = 'config-key';
-    label.textContent = item.key + ': ';
+    label.textContent = item.value + ': ';
     div.appendChild(label);
     if (readOnlyKeys.includes(item.key)) {
       const valueSpan = document.createElement('span');

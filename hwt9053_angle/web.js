@@ -64,7 +64,7 @@ app.get('/config-json', (req, res) => {
   res.json({ sys: sysConfig, env: envConfig });
 });
 
-// POST /update-config：針對單一 key 更新設定
+// POST /update-config：針對單一 key 更新設定，更新完成後重啟網站
 app.post('/update-config', (req, res) => {
   const { key, value } = req.body;
   if (!key) {
@@ -86,8 +86,17 @@ app.post('/update-config', (req, res) => {
   }
   fs.writeFileSync(sysConfPath, generateConfigContent(sysConfig), 'utf8');
   fs.writeFileSync(envPath, generateConfigContent(envConfig), 'utf8');
-  res.json({ success: true, message: `${key} 更新成功` });
+  
+  // 更新完成後，執行 sudo pm2 restart website 重啟網站
+  exec('sudo pm2 restart website', (error, stdout, stderr) => {
+    if (error) {
+      console.error(`pm2 restart error: ${error}`);
+      return res.json({ success: false, message: `${key} 更新成功，但網站重啟失敗：${error.message}` });
+    }
+    res.json({ success: true, message: `${key} 更新成功並重新啟動網站` });
+  });
 });
+
 
 // 取得 wwan0 的 IP 位址
 function getWWAN0IP(callback) {

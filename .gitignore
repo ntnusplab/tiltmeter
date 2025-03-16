@@ -5,5 +5,6 @@ hwt9053_angle/node_modules
 hwt9053_angle/env*
 圖檔
 config.json
-mbim.service.txt
+mbim_start_connect.service.txt
 Status_led.service.txt
+ntp_setting.txt

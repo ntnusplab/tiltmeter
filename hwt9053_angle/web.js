@@ -64,7 +64,7 @@ app.get('/config-json', (req, res) => {
   res.json({ sys: sysConfig, env: envConfig });
 });
 
-// POST /update-config：針對單一 key 更新設定，更新完成後重啟網站
+// POST /update-config：針對單一 key 更新設定（不再自動重啟 pm2）
 app.post('/update-config', (req, res) => {
   const { key, value } = req.body;
   if (!key) {
@@ -86,14 +86,17 @@ app.post('/update-config', (req, res) => {
   }
   fs.writeFileSync(sysConfPath, generateConfigContent(sysConfig), 'utf8');
   fs.writeFileSync(envPath, generateConfigContent(envConfig), 'utf8');
-  
-  // 更新完成後，執行 sudo pm2 restart website 重啟網站
-  exec('sudo pm2 restart website', (error, stdout, stderr) => {
+  res.json({ success: true, message: `${key} 更新成功` });
+});
+
+// 新增 API：POST /restart_tiltmeter 來重新開機系統
+app.post('/restart_tiltmeter', (req, res) => {
+  exec('sudo reboot', (error, stdout, stderr) => {
     if (error) {
-      console.error(`pm2 restart error: ${error}`);
-      return res.json({ success: false, message: `${key} 更新成功，但網站重啟失敗：${error.message}` });
+      console.error(`reboot error: ${error}`);
+      return res.json({ success: false, message: `系統重啟失敗：${error.message}` });
     }
-    res.json({ success: true, message: `${key} 更新成功並重新啟動網站` });
+    res.json({ success: true, message: '系統已重新開機' });
   });
 });
 

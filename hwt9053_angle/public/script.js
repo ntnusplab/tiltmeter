@@ -150,3 +150,17 @@ function checkConnectionStatus() {
 setInterval(checkConnectionStatus, 60000);
 document.getElementById('refreshConnectionBtn').addEventListener('click', checkConnectionStatus);
 document.getElementById('refreshConfigBtn').addEventListener('click', loadConfig);
+
+// 新增重新開機按鈕事件，呼叫 /restart_tiltmeter API
+document.getElementById('restartWebsiteBtn').addEventListener('click', function () {
+  if (confirm("確認要重新開機系統嗎？")) {
+    fetch('/restart_tiltmeter', {
+      method: 'POST'
+    })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+      })
+      .catch(err => console.error('Error:', err));
+  }
+});

@@ -23,10 +23,9 @@ app.post('/login', (req, res) => {
   }
 });
 
-// 檔案路徑：sys.conf 位於上一層；.env 與 .config.json 位於本層
+// 檔案路徑設定：sys.conf 位於上一層，.env 位於本層
 const sysConfPath = path.join(__dirname, '..', 'sys.conf');
 const envPath = path.join(__dirname, '.env');
-const combinedConfigPath = path.join(__dirname, '.config.json');
 
 // 輔助函數：解析 key=value 格式的文字
 function parseConfig(content) {
@@ -43,7 +42,7 @@ function parseConfig(content) {
   return config;
 }
 
-// 輔助函數：將物件轉成 key=value 格式字串
+// 輔助函數：將物件轉成 key=value 格式的字串
 function generateConfigContent(configObj) {
   let content = "";
   for (const key in configObj) {
@@ -52,34 +51,50 @@ function generateConfigContent(configObj) {
   return content;
 }
 
-// 產生扁平化設定：合併 sys.conf 與 .env
-function generateFlatConfig() {
+// GET /config-json：讀取各自的設定檔，不再合併
+app.get('/config-json', (req, res) => {
   let sysConfig = {};
   let envConfig = {};
   if (fs.existsSync(sysConfPath)) {
-    const sysContent = fs.readFileSync(sysConfPath, 'utf8');
-    sysConfig = parseConfig(sysContent);
+    sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
   }
   if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    envConfig = parseConfig(envContent);
+    envConfig = parseConfig(fs.readFileSync(envPath, 'utf8'));
   }
-  // 假設兩邊的 key 不會重複
-  return { ...sysConfig, ...envConfig };
-}
+  res.json({ sys: sysConfig, env: envConfig });
+});
 
-// 更新隱藏的 .config.json 檔案
-function updateCombinedConfigFile(flatConfig) {
-  fs.writeFileSync(combinedConfigPath, JSON.stringify(flatConfig, null, 2), 'utf8');
-}
+// POST /update-config：針對單一 key 更新設定
+app.post('/update-config', (req, res) => {
+  const { key, value } = req.body;
+  if (!key) {
+    return res.status(400).json({ error: '未提供 key' });
+  }
+  let sysConfig = {};
+  let envConfig = {};
+  if (fs.existsSync(sysConfPath)) {
+    sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
+  }
+  if (fs.existsSync(envPath)) {
+    envConfig = parseConfig(fs.readFileSync(envPath, 'utf8'));
+  }
+  // 若 key 存在於 sys.conf 中則更新 sys，否則預設更新到 .env
+  if (sysConfig.hasOwnProperty(key)) {
+    sysConfig[key] = value;
+  } else {
+    envConfig[key] = value;
+  }
+  fs.writeFileSync(sysConfPath, generateConfigContent(sysConfig), 'utf8');
+  fs.writeFileSync(envPath, generateConfigContent(envConfig), 'utf8');
+  res.json({ success: true, message: `${key} 更新成功` });
+});
 
+// 取得 wwan0 的 IP 位址
 function getWWAN0IP(callback) {
   exec('ip addr show wwan0', (error, stdout, stderr) => {
     if (error) {
-      // 若指令執行錯誤，回傳 null
       return callback(null);
     }
-    // 使用正則表達式找出 "inet <IP>" 部分
     const match = stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
     if (match) {
       callback(match[1]);
@@ -89,55 +104,15 @@ function getWWAN0IP(callback) {
   });
 }
 
-// GET /config-json：回傳扁平化設定並更新 .config.json
-app.get('/config-json', (req, res) => {
-  const flatConfig = generateFlatConfig();
-  updateCombinedConfigFile(flatConfig);
-  res.json(flatConfig);
-});
-
-// POST /update-all-config：接收 { configData }，依據每個 key 更新原始檔案
-app.post('/update-all-config', (req, res) => {
-  const { configData } = req.body;
-  if (!configData || typeof configData !== 'object') {
-    return res.status(400).json({ error: '未提供正確的 configData' });
-  }
-  // 讀取原始檔案
-  let sysConfig = {};
-  let envConfig = {};
-  if (fs.existsSync(sysConfPath)) {
-    sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
-  }
-  if (fs.existsSync(envPath)) {
-    envConfig = parseConfig(fs.readFileSync(envPath, 'utf8'));
-  }
-  // 根據原本出現的檔案更新對應的 key；不存在則預設新增到 .env
-  for (let key in configData) {
-    if (sysConfig.hasOwnProperty(key)) {
-      sysConfig[key] = configData[key];
-    } else {
-      envConfig[key] = configData[key];
-    }
-  }
-  fs.writeFileSync(sysConfPath, generateConfigContent(sysConfig), 'utf8');
-  fs.writeFileSync(envPath, generateConfigContent(envConfig), 'utf8');
-
-  const flatConfig = { ...sysConfig, ...envConfig };
-  updateCombinedConfigFile(flatConfig);
-  res.json({ success: true, message: '設定檔更新成功' });
-});
-
-// GET /connection-status：從 sys.conf 讀取 IP 與 PORT，執行 nc 指令檢查連線，並使用 exec 取得 wwan0 的 IP
+// GET /connection-status：從 sys.conf 讀取 IP 與 PORT，檢查連線狀態並取得 wwan0 IP
 app.get('/connection-status', (req, res) => {
   let sysConfig = {};
   if (fs.existsSync(sysConfPath)) {
-    const content = fs.readFileSync(sysConfPath, 'utf8');
-    sysConfig = parseConfig(content);
+    sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
   }
   const IP = sysConfig.IP;
   const PORT = sysConfig.PORT;
 
-  // 先取得 wwan0 的 IP
   getWWAN0IP((wwan0IP) => {
     if (!IP || !PORT) {
       return res.json({ connected: false, message: 'sys.conf 中未設定 IP 或 PORT', wwan0IP });
@@ -151,7 +126,6 @@ app.get('/connection-status', (req, res) => {
   });
 });
 
-// 啟動伺服器
 server.listen(PORT, () => {
   console.log(`伺服器已啟動，請訪問 http://localhost:${PORT}`);
 });

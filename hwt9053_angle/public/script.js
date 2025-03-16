@@ -67,7 +67,7 @@ function populateConfigControls(configJson, controlConfig) {
   // 建立唯讀區塊
   const readonlyDiv = document.createElement('div');
   const readonlyHeader = document.createElement('h4');
-  readonlyHeader.innerText = "唯讀內容";
+  // readonlyHeader.innerText = "唯讀內容";
   readonlyDiv.appendChild(readonlyHeader);
 
   // 建立可修改區塊

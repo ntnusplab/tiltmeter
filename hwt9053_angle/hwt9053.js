@@ -238,16 +238,17 @@ async function sendDataToTcpServer(payload) {
 }
 
 async function resendBufferedData() {
-    let buffer = await readBufferFile();
-    if (buffer.length === 0)
-        return;
+
 
     if (isResending) {
-        console.log(`[${new Date().toISOString()}] Resending is already in progress. Found ${buffer.length} buffered entries to resend. Skipping duplicate call.`);
+        console.log(`[${new Date().toISOString()}] Resending is already in progress. Skipping duplicate call.`);
         return;
     }
     isResending = true;
     try {
+        let buffer = await readBufferFile();
+        if (buffer.length === 0)
+            return;
         console.log(`[${new Date().toISOString()}] Found ${buffer.length} buffered entries to resend.`);
 
         while (buffer.length > 0) {

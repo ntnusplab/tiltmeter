@@ -9,9 +9,9 @@ const fs = require('fs');
 
 // 從環境變數讀取 API URL 與其他設定
 const API_URL = process.env.API_URL;
-const DEVICE_ID = process.env.DEVICE_ID;
+const DEVICE_ID = str(process.env.DEVICE_ID);
 // const ANGLE_DIFFERENT_THERSHOLD = process.env.ANGLE_DIFFERENT_THERSHOLD;
-const BACKUP_TCP_HOST = process.env.BACKUP_TCP_HOST;
+const BACKUP_TCP_HOST = str(process.env.BACKUP_TCP_HOST);
 const BACKUP_TCP_PORT = process.env.BACKUP_TCP_PORT;
 const BACKUP_TCP_TEST = process.env.BACKUP_TCP_TEST;
 const SAMPLE_RATE = process.env.SAMPLE_RATE * 1000; //單位從微秒轉換成秒

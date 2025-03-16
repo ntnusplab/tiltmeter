@@ -28,19 +28,19 @@ function login() {
     .catch(err => console.error('Error:', err));
 }
 
-// 讀取後端設定資料，並以後端資料與控制設定建立畫面
+// 讀取後端設定資料，並根據控制設定建立畫面
 function loadConfig() {
   fetch('/config-json')
     .then(res => res.json())
     .then(data => {
       flatConfig = data;
-      // 傳入取得的設定資料 flatConfig 與用來控制下拉選單顯示內容的 dropdownConfig
+      // 傳入取得的設定資料 flatConfig 與用來控制顯示內容的 dropdownConfig
       populateConfigControls(flatConfig, dropdownConfig);
     })
     .catch(err => console.error('Error:', err));
 }
 
-// 用來控制下拉選單顯示內容的設定
+// 用來控制顯示內容的設定
 const dropdownConfig = {
   hiddenKeys: ['SERIALPORT_PATH', 'BACKUP_TCP_TEST', 'API_URL'], // 隱藏的選項
   readOnlyKeys: ['DEVICE_ID'],                                   // 唯讀（靜態顯示）的選項
@@ -56,95 +56,64 @@ const dropdownConfig = {
 };
 
 /**
- * 根據後端設定資料（configJson）與控制設定（controlConfig）
- * 1. 將 readOnlyKeys 中的項目以靜態欄位呈現
- * 2. 以下拉選單（僅顯示 key）及旁邊的文字欄位呈現可編輯項目，
- *    文字欄位顯示所選項目對應的 value，且允許編輯。
+ * 根據後端設定資料（configJson）與控制設定（controlConfig），
+ * 將不在 hiddenKeys 裡的選項依序列出：
+ *  - 若屬於 readOnlyKeys，則以靜態方式呈現（不可編輯）
+ *  - 其他則顯示為可編輯的文字欄位，並預設填入對應的 value
  */
 function populateConfigControls(configJson, controlConfig) {
   const container = document.getElementById('configContainer');
   container.innerHTML = ''; // 清空舊內容
 
+  const hiddenKeys = controlConfig.hiddenKeys || [];
   const readOnlyKeys = controlConfig.readOnlyKeys || [];
   const options = controlConfig.options || [];
 
-  // 處理唯讀欄位：直接以靜態方式顯示 key 與對應的 value
   options.forEach(item => {
+    // 只處理不在 hiddenKeys 的項目
+    if (hiddenKeys.includes(item.key)) return;
+
+    // 建立每個項目的容器
+    const div = document.createElement('div');
+    div.className = 'config-item';
+
+    // 建立標籤
+    const label = document.createElement('span');
+    label.className = 'config-key';
+    label.textContent = item.key + ': ';
+    div.appendChild(label);
+
     if (readOnlyKeys.includes(item.key)) {
-      const roDiv = document.createElement('div');
-      roDiv.className = 'config-item readonly';
-      
-      const label = document.createElement('span');
-      label.className = 'config-key';
-      label.textContent = item.key;
-      
+      // 若屬於唯讀項目，直接以靜態方式呈現
       const valueSpan = document.createElement('span');
       valueSpan.className = 'config-value';
       valueSpan.textContent = configJson[item.key] || '';
-      
-      roDiv.appendChild(label);
-      roDiv.appendChild(document.createTextNode(': '));
-      roDiv.appendChild(valueSpan);
-      container.appendChild(roDiv);
+      div.appendChild(valueSpan);
+    } else {
+      // 可編輯項目，建立文字輸入欄位
+      const input = document.createElement('input');
+      input.className = 'config-value';
+      input.type = 'text';
+      input.value = configJson[item.key] || '';
+      // 使用 dataset 記錄 key，便於更新時讀取
+      input.dataset.key = item.key;
+      div.appendChild(input);
     }
+
+    container.appendChild(div);
   });
-
-  // 建立容器來放下拉選單與顯示對應值的文字欄位
-  const dropdownContainer = document.createElement('div');
-  dropdownContainer.className = 'dropdown-container';
-
-  // 建立下拉選單：僅加入非唯讀且不在隱藏清單中的項目
-  const dropdown = document.createElement('select');
-  dropdown.id = 'configDropdown';
-  const hiddenKeys = controlConfig.hiddenKeys || [];
-  options.forEach(item => {
-    if (hiddenKeys.includes(item.key)) return;
-    if (readOnlyKeys.includes(item.key)) return;
-    
-    const option = document.createElement('option');
-    option.value = item.key;
-    option.textContent = item.key; // 僅顯示 key
-    dropdown.appendChild(option);
-  });
-
-  // 建立文字欄位用以顯示下拉選單選項對應的 value，並允許編輯
-  const valueField = document.createElement('input');
-  valueField.id = 'selectedValueField';
-  valueField.type = 'text';
-  // 不設定 readOnly，使其可以編輯
-  valueField.placeholder = '對應的值';
-
-  if (dropdown.options.length > 0) {
-    dropdownContainer.appendChild(dropdown);
-    dropdownContainer.appendChild(valueField);
-    container.appendChild(dropdownContainer);
-
-    // 初始化文字欄位：根據下拉選單第一個選項顯示對應的值
-    const initialKey = dropdown.value;
-    valueField.value = configJson[initialKey] || '';
-
-    // 當下拉選單選項改變時，更新文字欄位內容，但使用者可以自行編輯
-    dropdown.addEventListener('change', function () {
-      const selectedKey = dropdown.value;
-      valueField.value = configJson[selectedKey] || '';
-    });
-  }
 }
 
-// 更新設定檔按鈕：根據下拉選單與文字欄位取得使用者修改的資料後送出更新請求
+// 更新設定檔按鈕：將所有可編輯項目的新值送出更新
 document.getElementById('updateConfigBtn').addEventListener('click', function () {
-  const dropdown = document.getElementById('configDropdown');
-  const valueField = document.getElementById('selectedValueField');
-  
-  if (!dropdown || !valueField) {
-    console.error('無法找到下拉選單或對應的文字欄位');
-    return;
-  }
-  
-  const selectedKey = dropdown.value;
-  const newValue = valueField.value;
+  // 僅挑選 input.config-value（不包含唯讀的 span）
+  const inputs = document.querySelectorAll('input.config-value');
   const updatedConfig = {};
-  updatedConfig[selectedKey] = newValue;
+  inputs.forEach(input => {
+    const key = input.dataset.key;
+    const value = input.value;
+    updatedConfig[key] = value;
+  });
 
   fetch('/update-all-config', {
     method: 'POST',

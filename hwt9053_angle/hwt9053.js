@@ -221,7 +221,7 @@ async function sendDataToTcpServer(payload) {
     try {
         // 嘗試發送新的 payload
         await axios.post(API_URL, payload);
-        console.log(`[${new Date().toISOString()}] Sent to API_URL successfully.`);
+        console.log(`[${new Date().toISOString()}] Sent to DATABASE successfully.`);
 
         // 發送成功後，嘗試從 JSON 檔案中補傳資料
         await resendBufferedData();

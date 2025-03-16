@@ -14,7 +14,7 @@ const DEVICE_ID = process.env.DEVICE_ID;
 const BACKUP_TCP_HOST = process.env.BACKUP_TCP_HOST;
 const BACKUP_TCP_PORT = process.env.BACKUP_TCP_PORT;
 const BACKUP_TCP_TEST = process.env.BACKUP_TCP_TEST;
-const SAMPLE_RATE = process.env.SAMPLE_RATE*1000; //單位從微秒轉換成秒
+const SAMPLE_RATE = process.env.SAMPLE_RATE * 1000; //單位從微秒轉換成秒
 const SERIALPORT_PATH = process.env.SERIALPORT_PATH;
 
 if (!API_URL) {
@@ -238,15 +238,16 @@ async function sendDataToTcpServer(payload) {
 }
 
 async function resendBufferedData() {
+    let buffer = await readBufferFile();
+    if (buffer.length === 0)
+        return;
+
     if (isResending) {
-        console.log(`[${new Date().toISOString()}] Resending is already in progress. Skipping duplicate call.`);
+        console.log(`[${new Date().toISOString()}] Resending is already in progress. Found ${buffer.length} buffered entries to resend. Skipping duplicate call.`);
         return;
     }
     isResending = true;
     try {
-        let buffer = await readBufferFile();
-        if (buffer.length === 0) return;
-
         console.log(`[${new Date().toISOString()}] Found ${buffer.length} buffered entries to resend.`);
 
         while (buffer.length > 0) {

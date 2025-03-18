@@ -160,6 +160,19 @@ app.post('/restart_sensor', (req, res) => {
   });
 });
 
+app.get('/server-time', (req, res) => {
+  res.json({
+    time: new Date().toLocaleString('zh-TW', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  });
+});
+
 server.listen(PORT, () => {
   console.log(`伺服器已啟動，請訪問 http://localhost:${PORT}`);
 });

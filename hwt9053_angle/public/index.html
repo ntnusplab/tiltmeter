@@ -84,24 +84,18 @@
   <script src="/bootstrap/js/bootstrap.bundle.min.js"></script>
 
   <script>
-    // 定義一個更新時間的函式
-    function updateTime() {
-      const now = new Date();
-      // 使用 zh-TW 格式化時間，顯示完整日期與時間
-      const formattedTime = now.toLocaleString('zh-TW', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-      document.getElementById('currentTime').innerText = '當前時間：' + formattedTime;
+    function updateServerTime() {
+      fetch('/server-time')
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('currentTime').innerText = '當前時間：' + data.time;
+        })
+        .catch(err => console.error('取得 Pi 時間失敗：', err));
     }
 
     // 每秒更新一次
-    setInterval(updateTime, 1000);
-    updateTime();
+    setInterval(updateServerTime, 1000);
+    updateServerTime();
   </script>
 </body>
 

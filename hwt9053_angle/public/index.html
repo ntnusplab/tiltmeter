@@ -34,6 +34,7 @@
 
 <body>
   <div class="container mt-5">
+    <div id="currentTime" class="text-end mb-4" style="font-size: 1.2em;"></div>
     <!-- <h1 class="mb-4"><i class="fa-solid fa-right-to-bracket"></i> 登入</h1> -->
     <div id="loginDiv" class="card p-4 mb-4">
       <div class="mb-3">
@@ -81,6 +82,27 @@
   <script src="script.js"></script>
   <!-- 本機 Bootstrap JS (含 Popper) -->
   <script src="/bootstrap/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // 定義一個更新時間的函式
+    function updateTime() {
+      const now = new Date();
+      // 使用 zh-TW 格式化時間，顯示完整日期與時間
+      const formattedTime = now.toLocaleString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+      document.getElementById('currentTime').innerText = '當前時間：' + formattedTime;
+    }
+
+    // 每秒更新一次
+    setInterval(updateTime, 1000);
+    updateTime();
+  </script>
 </body>
 
 </html>

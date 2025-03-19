@@ -271,7 +271,7 @@ async function resendBufferedData() {
 }
 
 function sendBackupTcpData(payload) {
-    const backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z}###\r\n`;
+    const backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z},${payload.cpu_temperture},${payload.cpu_voltage},${payload.rssi}###\r\n`;
 
     const client = new net.Socket();
 

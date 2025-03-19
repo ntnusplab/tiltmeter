@@ -277,9 +277,13 @@ function sendBackupTcpData(payload, client) {
         // let backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z},${payload.cpu_temperture},${payload.cpu_voltage},${payload.rssi}###`;
         let backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z}###`;
         console.log(`[${new Date().toISOString()}] Sent data to TCP server...`);
-        client.write(backup_payload, () => {
+        client.write(Buffer.from(backup_payload, 'utf-8'), () => {
             client.end();
         });
+
+        // client.write(backup_payload, () => {
+        //     client.end();
+        // });
     });
 
     client.on('error', (err) => {

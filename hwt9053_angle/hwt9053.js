@@ -215,7 +215,6 @@ async function appendToBufferFile(payload) {
 }
 
 async function sendDataToTcpServer(payload) {
-    const client = new net.Socket();
     console.log(`[${new Date().toISOString()}] Sending data to DATABASE...`);
 
     try {
@@ -233,7 +232,7 @@ async function sendDataToTcpServer(payload) {
 
     // 備援 TCP 傳輸
     if (BACKUP_TCP_TEST === 'true') {
-        sendBackupTcpData(payload, client);
+        sendBackupTcpData(payload);
     }
 }
 
@@ -272,7 +271,8 @@ async function resendBufferedData() {
 }
 
 
-function sendBackupTcpData(payload, client) {
+function sendBackupTcpData(payload) {
+    const client = new net.Socket();
     client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {
         // let backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z},${payload.cpu_temperture},${payload.cpu_voltage},${payload.rssi}###`;
         let backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z}###`;

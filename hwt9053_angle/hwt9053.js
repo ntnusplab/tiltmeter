@@ -270,30 +270,44 @@ async function resendBufferedData() {
     }
 }
 
+const net = require('net');
+const axios = require('axios');
 
 function sendBackupTcpData(payload) {
-    const client = new net.Socket();
-    client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {
-        // let backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z},${payload.cpu_temperture},${payload.cpu_voltage},${payload.rssi}###`;
-        let backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z}###`;
-        console.log(`[${new Date().toISOString()}] Sent data to TCP server...`);
-        client.write(Buffer.from(backup_payload, 'utf-8'), () => {
-            client.end();
+    // const client = new net.Socket();
+    // const backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z}###`;
+
+    // // 連接 TCP 伺服器
+    // client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {
+    //     console.log(`[${new Date().toISOString()}] Connected to TCP server...`);
+
+    //     // 發送 TCP 數據
+    //     client.write(Buffer.from(backup_payload, 'utf-8'), () => {
+    //         console.log(`[${new Date().toISOString()}] Sent data to TCP server: ${backup_payload}`);
+    //         client.end(); // 發送完畢後關閉連線
+    //     });
+    // });
+
+    // // 錯誤處理
+    // client.on('error', (err) => {
+    //     console.error(`[${new Date().toISOString()}] TCP client error:`, err.message);
+    // });
+
+    // client.on('close', () => {
+    //     console.log(`[${new Date().toISOString()}] TCP connection closed.`);
+    // });
+
+    // 使用 HTTP 備份傳輸
+    const httpUrl = `http://${BACKUP_TCP_HOST}:${BACKUP_TCP_PORT}/`;
+    axios.get(httpUrl, { params: { backup_payload } })
+        .then((res) => {
+            console.log(`[${new Date().toISOString()}] HTTP Backup Response: ${res.status} - ${res.data}`);
+        })
+        .catch((error) => {
+            console.error(`[${new Date().toISOString()}] HTTP GET request error:`, error.message);
         });
-
-        // client.write(backup_payload, () => {
-        //     client.end();
-        // });
-    });
-
-    client.on('error', (err) => {
-        console.error(`TCP client error:`, err.message);
-    });
-
-    client.on('close', () => {
-        console.log("TCP connection closed.");
-    });
 }
+
 
 
 function scheduleSendCommand() {

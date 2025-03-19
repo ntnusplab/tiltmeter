@@ -272,7 +272,7 @@ async function resendBufferedData() {
 
 function sendBackupTcpData(payload) {
     // const client = new net.Socket();
-    // const backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z}###`;
+    const backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z}###`;
 
     // // 連接 TCP 伺服器
     // client.connect(BACKUP_TCP_PORT, BACKUP_TCP_HOST, () => {

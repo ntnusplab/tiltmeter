@@ -270,9 +270,6 @@ async function resendBufferedData() {
     }
 }
 
-const net = require('net');
-const axios = require('axios');
-
 function sendBackupTcpData(payload) {
     // const client = new net.Socket();
     // const backup_payload = `$$$${DEVICE_ID},${payload.sensing_time},${payload.ang_x},${payload.ang_y},${payload.ang_z}###`;

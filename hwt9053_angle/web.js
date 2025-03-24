@@ -5,6 +5,8 @@ const path = require('path');
 const { exec } = require('child_process');
 const app = express();
 const http = require('http');
+const { SerialPort } = require('serialport');
+const { ReadlineParser } = require('@serialport/parser-readline');
 const server = http.createServer(app);
 const PORT = 8080;
 
@@ -151,6 +153,57 @@ app.post('/restart_network', (req, res) => {
 
 // 新增 API：POST /restart_sensor 來重啟感測器
 app.post('/restart_sensor', (req, res) => {
+
+  const portPath = '/dev/ttyUSB2'; // 根據你的實際連接埠調整
+  const baudRate = 115200;
+  const atCommand = 'AT+CFUN=1,1';
+
+  // 開啟串口
+  const port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
+    if (err) {
+      console.error(`Error opening serial port: ${err.message}`);
+      return res.json({ success: false, message: `開啟串口失敗：${err.message}` });
+    }
+  });
+
+  const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+  let responseSent = false;
+
+  // 監聽串口回應
+  parser.on('data', (data) => {
+    console.log(`Received response: ${data}`);
+    // 根據你的需求可以在此判斷是否收到預期的回應
+    if (!responseSent) {
+      res.json({ success: true, message: '4G 模組已發送重啟指令' });
+      responseSent = true;
+      port.close();
+    }
+  });
+
+  // 當串口開啟後，發送 AT 指令
+  port.on('open', () => {
+    console.log(`Sending command: ${atCommand}`);
+    port.write(atCommand + '\r\n', (err) => {
+      if (err) {
+        console.error(`Error writing to serial port: ${err.message}`);
+        if (!responseSent) {
+          res.json({ success: false, message: `發送 AT 指令失敗：${err.message}` });
+          responseSent = true;
+        }
+        port.close();
+      }
+    });
+  });
+
+  // 監聽錯誤事件
+  port.on('error', (err) => {
+    console.error(`Serial port error: ${err.message}`);
+    if (!responseSent) {
+      res.json({ success: false, message: `串口錯誤：${err.message}` });
+      responseSent = true;
+    }
+  });
+
   exec('sudo pm2 restart tiltmeter', (error, stdout, stderr) => {
     if (error) {
       console.error(`restart sensor error: ${error}`);

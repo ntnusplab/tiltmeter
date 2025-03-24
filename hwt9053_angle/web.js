@@ -142,17 +142,6 @@ app.get('/connection-status', (req, res) => {
 
 // 新增 API：POST /restart_network 來重新連線網路
 app.post('/restart_network', (req, res) => {
-  exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
-    if (error) {
-      console.error(`restart network error: ${error}`);
-      return res.json({ success: false, message: `網路重新連線失敗：${error.message}` });
-    }
-    res.json({ success: true, message: '網路已重新連線' });
-  });
-});
-
-// 新增 API：POST /restart_sensor 來重啟感測器
-app.post('/restart_sensor', (req, res) => {
 
   const portPath = '/dev/ttyUSB2'; // 根據你的實際連接埠調整
   const baudRate = 115200;
@@ -203,6 +192,18 @@ app.post('/restart_sensor', (req, res) => {
       responseSent = true;
     }
   });
+
+  exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
+    if (error) {
+      console.error(`restart network error: ${error}`);
+      return res.json({ success: false, message: `網路重新連線失敗：${error.message}` });
+    }
+    res.json({ success: true, message: '網路已重新連線' });
+  });
+});
+
+// 新增 API：POST /restart_sensor 來重啟感測器
+app.post('/restart_sensor', (req, res) => {
 
   exec('sudo pm2 restart tiltmeter', (error, stdout, stderr) => {
     if (error) {

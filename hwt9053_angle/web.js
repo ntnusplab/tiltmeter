@@ -88,7 +88,7 @@ app.post('/update-config', (req, res) => {
   }
   fs.writeFileSync(sysConfPath, generateConfigContent(sysConfig), 'utf8');
   fs.writeFileSync(envPath, generateConfigContent(envConfig), 'utf8');
-  res.json({ success: true, message: `${key} 更新成功` });
+  res.json({ success: true, message: ` 更新成功` });
 });
 
 // 新增 API：POST /restart_tiltmeter 來重新開機系統

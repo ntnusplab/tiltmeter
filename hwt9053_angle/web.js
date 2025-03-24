@@ -139,10 +139,7 @@ app.get('/connection-status', (req, res) => {
     });
   });
 });
-
-// 新增 API：POST /restart_network 來重新連線網路
 app.post('/restart_network', (req, res) => {
-
   const portPath = '/dev/ttyUSB2'; // 根據你的實際連接埠調整
   const baudRate = 115200;
   const atCommand = 'AT+CFUN=1,1';
@@ -158,28 +155,44 @@ app.post('/restart_network', (req, res) => {
   const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
   let responseSent = false;
 
+  // 定義一個函數，用於延遲後執行網路重啟
+  function restartNetwork() {
+    setTimeout(() => {
+      exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
+        if (error) {
+          console.error(`restart network error: ${error}`);
+          if (!responseSent) {
+            res.json({ success: false, message: `網路重新連線失敗：${error.message}` });
+            responseSent = true;
+          }
+          return;
+        }
+        if (!responseSent) {
+          res.json({ success: true, message: '網路已重新連線' });
+          responseSent = true;
+        }
+      });
+    }, 5000); // 延遲 5 秒後執行 exec，可根據需求調整延遲時間
+  }
+
   // 監聽串口回應
   parser.on('data', (data) => {
     console.log(`Received response: ${data}`);
-    // 根據你的需求可以在此判斷是否收到預期的回應
+    // 收到回應後關閉串口
+    port.close();
     if (!responseSent) {
-      res.json({ success: true, message: '4G 模組已發送重啟指令' });
-      responseSent = true;
-      port.close();
+      // 執行重啟網路（延遲後執行 exec）
+      restartNetwork();
     }
   });
 
-  // 當串口開啟後，發送 AT 指令
+  // 當串口開啟後發送 AT 指令
   port.on('open', () => {
     console.log(`Sending command: ${atCommand}`);
     port.write(atCommand + '\r\n', (err) => {
       if (err) {
         console.error(`Error writing to serial port: ${err.message}`);
-        if (!responseSent) {
-          res.json({ success: false, message: `發送 AT 指令失敗：${err.message}` });
-          responseSent = true;
-        }
-        port.close();
+        return res.json({ success: false, message: `發送 AT 指令失敗：${err.message}` });
       }
     });
   });
@@ -187,18 +200,7 @@ app.post('/restart_network', (req, res) => {
   // 監聽錯誤事件
   port.on('error', (err) => {
     console.error(`Serial port error: ${err.message}`);
-    if (!responseSent) {
-      res.json({ success: false, message: `串口錯誤：${err.message}` });
-      responseSent = true;
-    }
-  });
-
-  exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
-    if (error) {
-      console.error(`restart network error: ${error}`);
-      return res.json({ success: false, message: `網路重新連線失敗：${error.message}` });
-    }
-    res.json({ success: true, message: '網路已重新連線' });
+    return res.json({ success: false, message: `串口錯誤：${err.message}` });
   });
 });
 

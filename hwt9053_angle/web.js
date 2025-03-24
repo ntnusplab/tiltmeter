@@ -172,7 +172,7 @@ app.post('/restart_network', (req, res) => {
           responseSent = true;
         }
       });
-    }, 5000); // 延遲 5 秒後執行 exec，可根據需求調整延遲時間
+    }, 30000); // 延遲 30 秒後執行 exec，可根據需求調整延遲時間
   }
 
   // 監聽串口回應

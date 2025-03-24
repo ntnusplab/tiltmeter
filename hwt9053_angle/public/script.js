@@ -123,7 +123,7 @@ function updateConfig(key, value) {
     .then(res => res.json())
     .then(data => {
       alert(data.message || '更新成功');
-      loadConfig();
+      // loadConfig();
     })
     .catch(err => console.error('Error:', err));
 }

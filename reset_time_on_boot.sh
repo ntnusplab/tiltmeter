@@ -9,6 +9,7 @@ while true; do
         echo "檢測到 wwan0 的 IPv4 地址：$ip_addr"
         echo "開始重啟 systemd-timesyncd 服務..."
         sudo systemctl restart systemd-timesyncd.service
+        sudo pm2 restart 1
         # 重啟後退出迴圈，若希望持續監控，可移除此 break
         break
     fi

@@ -155,44 +155,39 @@ app.post('/restart_network', (req, res) => {
   const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
   let responseSent = false;
 
-  // 定義一個函數，用於延遲後執行網路重啟
-  function restartNetwork() {
-    setTimeout(() => {
-      exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
-        if (error) {
-          console.error(`restart network error: ${error}`);
-          if (!responseSent) {
-            res.json({ success: false, message: `網路重新連線失敗：${error.message}` });
-            responseSent = true;
-          }
-          return;
-        }
-        if (!responseSent) {
-          res.json({ success: true, message: '網路已重新連線' });
-          responseSent = true;
+  // 定義一個關閉串口的函式，檢查是否開啟中
+  function safeClosePort() {
+    if (port.isOpen) {
+      port.close((err) => {
+        if (err && err.message !== 'Port is not open') {
+          console.error(`Closing port error: ${err.message}`);
         }
       });
-    }, 30000); // 延遲 30 秒後執行 exec，可根據需求調整延遲時間
+    }
   }
 
   // 監聽串口回應
   parser.on('data', (data) => {
     console.log(`Received response: ${data}`);
-    // 收到回應後關閉串口
-    port.close();
+    // 根據需求判斷是否收到預期的回應
     if (!responseSent) {
-      // 執行重啟網路（延遲後執行 exec）
-      restartNetwork();
+      res.json({ success: true, message: '4G 模組已發送重啟指令' });
+      responseSent = true;
+      safeClosePort();
     }
   });
 
-  // 當串口開啟後發送 AT 指令
+  // 當串口開啟後，發送 AT 指令
   port.on('open', () => {
     console.log(`Sending command: ${atCommand}`);
     port.write(atCommand + '\r\n', (err) => {
       if (err) {
         console.error(`Error writing to serial port: ${err.message}`);
-        return res.json({ success: false, message: `發送 AT 指令失敗：${err.message}` });
+        if (!responseSent) {
+          res.json({ success: false, message: `發送 AT 指令失敗：${err.message}` });
+          responseSent = true;
+        }
+        safeClosePort();
       }
     });
   });
@@ -200,8 +195,29 @@ app.post('/restart_network', (req, res) => {
   // 監聽錯誤事件
   port.on('error', (err) => {
     console.error(`Serial port error: ${err.message}`);
-    return res.json({ success: false, message: `串口錯誤：${err.message}` });
+    if (!responseSent) {
+      res.json({ success: false, message: `串口錯誤：${err.message}` });
+      responseSent = true;
+    }
   });
+
+  // 延遲後執行 exec 指令重啟網路
+  setTimeout(() => {
+    exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
+      if (error) {
+        console.error(`restart network error: ${error}`);
+        if (!responseSent) {
+          res.json({ success: false, message: `網路重新連線失敗：${error.message}` });
+          responseSent = true;
+        }
+        return;
+      }
+      if (!responseSent) {
+        res.json({ success: true, message: '網路已重新連線' });
+        responseSent = true;
+      }
+    });
+  }, 30000); // 延遲 30 秒執行 exec，可根據需求調整
 });
 
 // 新增 API：POST /restart_sensor 來重啟感測器

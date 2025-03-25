@@ -9,4 +9,3 @@
 9. pm2 web
 10. systemd-resolved 
 11. ntp_setting
-12. 

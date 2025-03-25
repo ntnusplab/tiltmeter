@@ -63,9 +63,6 @@ if (!SERIALPORT_PATH) {
 }
 
 const READ_ACCELERATION_COMMAND = Buffer.from([0x50, 0x03, 0x00, 0x3D, 0x00, 0x06, 0x59, 0x85]);
-let startTime = Date.now(); // 當前絕對時間，毫秒
-let startHrtime = process.hrtime.bigint(); // 高精度時間，納秒
-// let startDay = new Date(startTime).toISOString().split('T')[0]; // 當前日期字串
 let isResending = false;
 let dataBuffer = Buffer.alloc(0);
 
@@ -90,9 +87,6 @@ if (fs.existsSync(bufferFilePath)) {
 
 function syncTimeAndSchedule() {
     console.log(`[${new Date().toISOString()}] Time synchronized using system clock.`);
-    startTime = Date.now();
-    startHrtime = process.hrtime.bigint();
-    startDay = new Date(startTime).toISOString().split('T')[0];
     scheduleSendCommand();
 }
 

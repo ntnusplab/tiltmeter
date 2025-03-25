@@ -100,9 +100,9 @@ const port = new SerialPort({
     parity: 'none',
 });
 
-function getPreciseAbsoluteTime() {
-    return new Date(performance.timeOrigin + performance.now());
-  }
+// function getPreciseAbsoluteTime() {
+//     return new Date(performance.timeOrigin + performance.now());
+// }
 
 // 發送讀取感測器指令
 function sendCommand() {
@@ -132,7 +132,7 @@ port.on('data', async (inputData) => {
                 const diskUsage = await getDiskUsagePercentage().catch(() => null);
 
                 const payload = {
-                    sensing_time: getPreciseAbsoluteTime().toISOString(),
+                    sensing_time: new Date().toISOString(),
                     ang_x: ang_x.toFixed(3),
                     ang_y: ang_y.toFixed(3),
                     ang_z: ang_z.toFixed(3),
@@ -154,7 +154,7 @@ port.on('data', async (inputData) => {
             } else {
                 console.log("CRC validation failed, discarding data.");
                 const errorLog = {
-                    sensing_time: getPreciseAbsoluteTime().toISOString(),
+                    sensing_time: new Date().toISOString(),
                     error: 'CRC validation failed'
                 };
                 dailyLogger.save(errorLog);
@@ -168,7 +168,7 @@ port.on('data', async (inputData) => {
             } else {
                 console.log('No valid frame found, clearing buffer.');
                 const errorLog = {
-                    sensing_time: getPreciseAbsoluteTime().toISOString(),
+                    sensing_time: new Date().toISOString(),
                     error: 'No valid frame found'
                 };
                 dailyLogger.save(errorLog);

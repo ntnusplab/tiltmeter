@@ -148,7 +148,7 @@ port.on('data', async (inputData) => {
                 };
                 // console.log(payload);
 
-                if (previous_payload && (Math.abs(previous_payload.ang_x - payload.ang_x) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_y - payload.ang_y) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_z - payload.ang_z) > ANGLE_DIFFERENT_THERSHOLD)) {
+                if ((previous_payload && (Math.abs(previous_payload.ang_x - payload.ang_x) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_y - payload.ang_y) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_z - payload.ang_z) > ANGLE_DIFFERENT_THERSHOLD)) || Date.now() % MIN_SAMPLE_RATE < 10000) {
                     try {
                         await sendDataToTcpServer(payload);
                     } catch (error) {
@@ -296,26 +296,16 @@ function sendBackupTcpData(payload) {
     client.on('close', () => {
         console.log(`[${new Date().toISOString()}] TCP connection closed.`);
     });
-
-    // // 使用 HTTP 備份傳輸
-    // const httpUrl = `http://${BACKUP_TCP_HOST}:${BACKUP_TCP_PORT}/`;
-    // axios.get(`${httpUrl}?data=${backup_payload}`)
-    //     .then((res) => {
-    //         console.log(`[${new Date().toISOString()}] HTTP Backup Response: ${res.status} - ${res.data}`);
-    //     })
-    //     .catch((error) => {
-    //         console.error(`[${new Date().toISOString()}] HTTP GET request error:`, error.message);
-    //     });
 }
 
 
 
 function scheduleSendCommand() {
     const now = new Date();
-    const msUntilNextMinute = SAMPLE_RATE - ((now.getSeconds() * 1000 + now.getMilliseconds()) % SAMPLE_RATE);
+    const msUntilNextMinute = MIN_SAMPLE_RATE - ((now.getSeconds() * 1000 + now.getMilliseconds()) % MIN_SAMPLE_RATE);
     setTimeout(() => {
         sendCommand();
-        setInterval(sendCommand, SAMPLE_RATE);
+        setInterval(sendCommand, MIN_SAMPLE_RATE);
     }, msUntilNextMinute);
 }
 

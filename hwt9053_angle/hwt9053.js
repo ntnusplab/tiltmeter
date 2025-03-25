@@ -6,7 +6,7 @@ const DailyLogger = require('./dailyLogger'); // 引入日誌模組
 const net = require('net');
 const path = require('path');
 const fs = require('fs');
-const { performance } = require('perf_hooks');
+// const { performance } = require('perf_hooks');
 
 // 從環境變數讀取 API URL 與其他設定
 const API_URL = process.env.API_URL;
@@ -16,6 +16,7 @@ const BACKUP_TCP_HOST = String(process.env.BACKUP_TCP_HOST);
 const BACKUP_TCP_PORT = process.env.BACKUP_TCP_PORT;
 const BACKUP_TCP_TEST = process.env.BACKUP_TCP_TEST;
 const SAMPLE_RATE = process.env.SAMPLE_RATE * 1000; //單位從微秒轉換成秒
+const MIN_SAMPLE_RATE = process.env.MIN_SAMPLE_RATE * 1000;
 const SERIALPORT_PATH = process.env.SERIALPORT_PATH;
 
 if (!API_URL) {
@@ -53,6 +54,11 @@ if (!BACKUP_TCP_TEST) {
     process.exit(1);
 }
 
+if (!MIN_SAMPLE_RATE) {
+    console.error('Error: MIN_SAMPLE_RATE is not defined in the .env file.');
+    process.exit(1);
+}
+
 if (!SAMPLE_RATE) {
     console.error('Error: SAMPLE_RATE is not defined in the .env file.');
     process.exit(1);
@@ -66,6 +72,7 @@ if (!SERIALPORT_PATH) {
 const READ_ACCELERATION_COMMAND = Buffer.from([0x50, 0x03, 0x00, 0x3D, 0x00, 0x06, 0x59, 0x85]);
 let isResending = false;
 let dataBuffer = Buffer.alloc(0);
+let previous_payload = null;
 
 const dailyLogger = new DailyLogger();
 // 用來記錄上次成功傳輸的 payload.sensing_time，初始為 null
@@ -99,10 +106,6 @@ const port = new SerialPort({
     stopBits: 1,
     parity: 'none',
 });
-
-// function getPreciseAbsoluteTime() {
-//     return new Date(performance.timeOrigin + performance.now());
-// }
 
 // 發送讀取感測器指令
 function sendCommand() {
@@ -143,13 +146,21 @@ port.on('data', async (inputData) => {
                     memUsage: memUsage,
                     diskUsage: diskUsage
                 };
-                console.log(payload);
-                try {
-                    await sendDataToTcpServer(payload);
-                } catch (error) {
-                    console.error(`[${new Date().toISOString()}] Error during TCP transmission:`, error.message);
+                // console.log(payload);
+
+                if (previous_payload && (Math.abs(previous_payload.ang_x - payload.ang_x) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_y - payload.ang_y) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_z - payload.ang_z) > ANGLE_DIFFERENT_THERSHOLD)) {
+                    try {
+                        await sendDataToTcpServer(payload);
+                    } catch (error) {
+                        console.error(`[${new Date().toISOString()}] Error during TCP transmission:`, error.message);
+                    }
+
+                } else {
+                    console.log("角度變化過小，不傳送資料");
                 }
+
                 dailyLogger.save(payload);
+                previous_payload = payload;
                 dataBuffer = dataBuffer.slice(17);
             } else {
                 console.log("CRC validation failed, discarding data.");
@@ -208,7 +219,6 @@ async function appendToBufferFile(payload) {
 
 async function sendDataToTcpServer(payload) {
     console.log(`[${new Date().toISOString()}] Sending data to DATABASE...`);
-
     try {
         // 嘗試發送新的 payload
         await axios.post(API_URL, payload);

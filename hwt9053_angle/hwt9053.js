@@ -148,7 +148,7 @@ port.on('data', async (inputData) => {
                 };
                 // console.log(payload);
 
-                if ((previous_payload && (Math.abs(previous_payload.ang_x - payload.ang_x) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_y - payload.ang_y) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_z - payload.ang_z) > ANGLE_DIFFERENT_THERSHOLD)) || Date.now() % MIN_SAMPLE_RATE < 10000) {
+                if ((previous_payload && (Math.abs(previous_payload.ang_x - payload.ang_x) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_y - payload.ang_y) > ANGLE_DIFFERENT_THERSHOLD) && (Math.abs(previous_payload.ang_z - payload.ang_z) > ANGLE_DIFFERENT_THERSHOLD)) || Date.now() % SAMPLE_RATE < 10000) {
                     try {
                         await sendDataToTcpServer(payload);
                     } catch (error) {

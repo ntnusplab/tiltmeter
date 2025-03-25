@@ -11,7 +11,9 @@ const dropdownConfig = {
     { key: 'BACKUP_TCP_PORT', label: '備份TCP傳輸PORT' },
     { key: 'DEVICE_ID', label: '設備編號' },
     { key: 'BACKUP_TCP_TEST', label: '啟用備份資料夾測試' },
+    { key: 'MIN_SAMPLE_RATE', label: '最小資料傳輸週期(秒)' },
     { key: 'SAMPLE_RATE', label: '資料傳輸週期(秒)' },
+    { key: 'ANGLE_DIFFERENT_THERSHOLD', label: '角度警報域值' },
     { key: 'SERIALPORT_PATH', label: 'RS485接口' },
   ]
 };

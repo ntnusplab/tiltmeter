@@ -163,7 +163,7 @@ port.on('data', async (inputData) => {
 
                 dailyLogger.save(payload);
                 previous_payload = payload;
-                dataBuffer = dataBuffer.subarray(17);
+                dataBuffer = Buffer.from(dataBuffer.subarray(17));
             } else {
                 console.log("CRC validation failed, discarding data.");
                 const errorLog = {
@@ -171,13 +171,13 @@ port.on('data', async (inputData) => {
                     error: 'CRC validation failed'
                 };
                 dailyLogger.save(errorLog);
-                dataBuffer = dataBuffer.subarray(17);
+                dataBuffer = Buffer.from(dataBuffer.subarray(17));
             }
         } else {
             const index = dataBuffer.indexOf(0x50, 1);
             if (index !== -1) {
                 console.log(`Discarding ${index} bytes to find the next valid frame.`);
-                dataBuffer = dataBuffer.subarray(index);
+                dataBuffer = Buffer.from(dataBuffer.subarray(index));
             } else {
                 console.log('No valid frame found, clearing buffer.');
                 const errorLog = {

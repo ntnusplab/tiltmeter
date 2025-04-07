@@ -168,11 +168,19 @@ app.post('/restart_network', (req, res) => {
     }
   }
 
+  // 設定 5 秒超時機制，如果在 5 秒內未收到 AT 指令回應，就嘗試關閉串口
+  const atTimeout = setTimeout(() => {
+    if (!responseSent) {
+      console.warn('5秒內未收到AT指令回應，嘗試關閉串口');
+      safeClosePort();
+    }
+  }, 5000);
+
   // 監聽串口回應
   parser.on('data', (data) => {
     console.log(`Received response: ${data}`);
-    // 根據需求判斷是否收到預期的回應
     if (!responseSent) {
+      clearTimeout(atTimeout);
       res.json({ success: true, message: '4G 模組已發送重啟指令' });
       responseSent = true;
       safeClosePort();
@@ -186,6 +194,7 @@ app.post('/restart_network', (req, res) => {
       if (err) {
         console.error(`Error writing to serial port: ${err.message}`);
         if (!responseSent) {
+          clearTimeout(atTimeout);
           res.json({ success: false, message: `發送 AT 指令失敗：${err.message}` });
           responseSent = true;
         }
@@ -198,12 +207,14 @@ app.post('/restart_network', (req, res) => {
   port.on('error', (err) => {
     console.error(`Serial port error: ${err.message}`);
     if (!responseSent) {
+      clearTimeout(atTimeout);
       res.json({ success: false, message: `串口錯誤：${err.message}` });
       responseSent = true;
     }
+    safeClosePort();
   });
 
-  // 延遲後執行 exec 指令重啟網路
+  // 延遲 30 秒後執行 exec 指令重啟網路
   setTimeout(() => {
     exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
       if (error) {
@@ -219,7 +230,7 @@ app.post('/restart_network', (req, res) => {
         responseSent = true;
       }
     });
-  }, 30000); // 延遲 30 秒執行 exec，可根據需求調整
+  }, 30000); // 可根據需求調整延遲時間
 });
 
 // 新增 API：POST /restart_sensor 來重啟感測器

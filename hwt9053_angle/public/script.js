@@ -1,3 +1,5 @@
+'use strict';
+
 let flatConfig = {};
 
 // 控制設定，決定哪些項目隱藏、唯讀或可修改

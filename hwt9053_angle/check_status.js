@@ -1,3 +1,5 @@
+'use strict';
+
 // Import necessary modules
 const { exec } = require('child_process');
 const { SerialPort } = require('serialport');

@@ -1,3 +1,5 @@
+'use strict';
+
 require('dotenv').config(); // 使用 dotenv 管理環境變數
 const { SerialPort } = require('serialport');
 const axios = require('axios');
@@ -121,9 +123,9 @@ port.on('data', async (inputData) => {
     dataBuffer = Buffer.concat([dataBuffer, inputData]);
 
     while (dataBuffer.length >= 17) {
-        if (dataBuffer.slice(0, 3).equals(Buffer.from([0x50, 0x03, 0x0c]))) {
-            const crcCalculated = crc16Modbus(dataBuffer.slice(0, 15));
-            if (crcCalculated.equals(dataBuffer.slice(15, 17))) {
+        if (dataBuffer.subarray(0, 3).equals(Buffer.from([0x50, 0x03, 0x0c]))) {
+            const crcCalculated = crc16Modbus(dataBuffer.subarray(0, 15));
+            if (crcCalculated.equals(dataBuffer.subarray(15, 17))) {
                 let ang_x = (dataBuffer[5] << 24 | dataBuffer[6] << 16 | dataBuffer[3] << 8 | dataBuffer[4]) / 1000;
                 let ang_y = (dataBuffer[9] << 24 | dataBuffer[10] << 16 | dataBuffer[7] << 8 | dataBuffer[8]) / 1000;
                 let ang_z = (dataBuffer[13] << 24 | dataBuffer[14] << 16 | dataBuffer[11] << 8 | dataBuffer[12]) / 1000;
@@ -161,7 +163,7 @@ port.on('data', async (inputData) => {
 
                 dailyLogger.save(payload);
                 previous_payload = payload;
-                dataBuffer = dataBuffer.slice(17);
+                dataBuffer = dataBuffer.subarray(17);
             } else {
                 console.log("CRC validation failed, discarding data.");
                 const errorLog = {
@@ -169,13 +171,13 @@ port.on('data', async (inputData) => {
                     error: 'CRC validation failed'
                 };
                 dailyLogger.save(errorLog);
-                dataBuffer = dataBuffer.slice(17);
+                dataBuffer = dataBuffer.subarray(17);
             }
         } else {
             const index = dataBuffer.indexOf(0x50, 1);
             if (index !== -1) {
                 console.log(`Discarding ${index} bytes to find the next valid frame.`);
-                dataBuffer = dataBuffer.slice(index);
+                dataBuffer = dataBuffer.subarray(index);
             } else {
                 console.log('No valid frame found, clearing buffer.');
                 const errorLog = {
@@ -239,8 +241,6 @@ async function sendDataToTcpServer(payload) {
 }
 
 async function resendBufferedData() {
-
-
     if (isResending) {
         console.log(`[${new Date().toISOString()}] Resending is already in progress. Skipping duplicate call.`);
         return;

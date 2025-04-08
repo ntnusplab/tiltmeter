@@ -75,6 +75,7 @@ const READ_ACCELERATION_COMMAND = Buffer.from([0x50, 0x03, 0x00, 0x3D, 0x00, 0x0
 let isResending = false;
 let dataBuffer = Buffer.alloc(0);
 let previous_payload = null;
+let sensing_time = null;
 
 const dailyLogger = new DailyLogger();
 // 用來記錄上次成功傳輸的 payload.sensing_time，初始為 null
@@ -111,6 +112,7 @@ const port = new SerialPort({
 
 // 發送讀取感測器指令
 function sendCommand() {
+    sensing_time = new Date().toISOString();
     port.write(READ_ACCELERATION_COMMAND, (err) => {
         if (err) {
             console.error('Error writing to port:', err.message);
@@ -137,7 +139,7 @@ port.on('data', async (inputData) => {
                 const diskUsage = await getDiskUsagePercentage().catch(() => null);
 
                 const payload = {
-                    sensing_time: new Date().toISOString(),
+                    sensing_time: sensing_time,
                     ang_x: ang_x.toFixed(3),
                     ang_y: ang_y.toFixed(3),
                     ang_z: ang_z.toFixed(3),

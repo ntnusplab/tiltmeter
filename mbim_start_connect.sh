@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# 停止可能已經存在的 waveshare-CM 進程
+# 停止之前可能存在的 waveshare-CM
 pkill -f waveshare-CM
 
-# 從 sys.conf 中讀取 APN 變數
+# 載入APN設定
 source /home/admin/tiltmeter/sys.conf
 
 echo "正在使用 APN: $APN 啟動 4G 連線..."
 
-# 直接執行 waveshare-CM（前景模式）
-exec waveshare-CM -s "$APN"
+# 使用 nohup 來啟動，保證後台穩定執行，不受腳本結束影響
+nohup waveshare-CM -s "$APN" >/dev/null 2>&1 &

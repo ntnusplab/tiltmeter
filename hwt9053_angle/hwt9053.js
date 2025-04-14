@@ -304,7 +304,7 @@ function sendBackupTcpData(payload) {
 
 function scheduleSendCommand() {
     const now = new Date();
-    const msUntilNextMinute = MIN_SAMPLE_RATE - ((now.getSeconds() * 1000 + now.getMilliseconds()) % MIN_SAMPLE_RATE);
+    const msUntilNextMinute = SAMPLE_RATE - ((now.getSeconds() * 1000 + now.getMilliseconds()) % SAMPLE_RATE);
     setTimeout(() => {
         sendCommand();
         setInterval(sendCommand, MIN_SAMPLE_RATE);

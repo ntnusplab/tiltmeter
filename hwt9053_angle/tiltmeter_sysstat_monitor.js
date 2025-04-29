@@ -113,8 +113,8 @@ async function main() {
     console.log('DEBUG: collectMetrics start');
     const metrics = await collectMetrics();
     console.log('DEBUG: sendMetrics start');
-    await sendMetrics(metrics);
-    console.log(`Sent ${metrics.length} entries`);
+    // await sendMetrics(metrics);
+    // console.log(`Sent ${metrics.length} entries`);
   } catch (err) {
     console.error('Error:', err.message);
   }

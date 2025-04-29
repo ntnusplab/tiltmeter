@@ -6,9 +6,10 @@ const execAsync = util.promisify(exec);
 async function collectMetrics() {
   let stdout;
   try {
-    ({ stdout } = await execAsync('pidstat -u -r -t 1 1'));
+    // 使用 -p ALL 确保列出所有线程
+    ({ stdout } = await execAsync('pidstat -u -r -t -p ALL 1 1'));
   } catch (err) {
-    console.error('Error: pidstat 命令执行失败:', err);
+    console.error('Error: pidstat 执行失败:', err);
     throw err;
   }
 
@@ -16,10 +17,12 @@ async function collectMetrics() {
     .split('\n')
     .filter(line => line.trim() && !line.startsWith('Average:'));
 
+  // 找到包含 %usr 的 CPU 表头
   const cpuHeaderIndex = lines.findIndex(line => line.includes('%usr'));
   if (cpuHeaderIndex < 0) throw new Error('无法找到 CPU 表头');
   const cpuHdr = lines[cpuHeaderIndex].trim().split(/\s+/);
 
+  // 解析 CPU 数据行，直到遇到 Memory 表头
   const cpuEntries = [];
   let idx = cpuHeaderIndex + 1;
   while (idx < lines.length && !lines[idx].includes('minflt/s')) {
@@ -29,12 +32,15 @@ async function collectMetrics() {
     cpuEntries.push(entry);
     idx++;
   }
+  // 过滤子命令行
   const filteredCpu = cpuEntries.filter(e => !e.Command.startsWith('|__'));
 
+  // 找 Memory 表头
   const memHeaderIndex = lines.findIndex(line => line.includes('minflt/s'));
   if (memHeaderIndex < 0) throw new Error('无法找到 Memory 表头');
   const memHdr = lines[memHeaderIndex].trim().split(/\s+/);
 
+  // 解析 Memory 数据行
   const memEntries = [];
   idx = memHeaderIndex + 1;
   while (idx < lines.length && lines[idx].trim()) {
@@ -46,6 +52,7 @@ async function collectMetrics() {
   }
   const filteredMem = memEntries.filter(e => !e.Command.startsWith('|__'));
 
+  // 合并并返回 JSON 数组
   return filteredCpu.map(cpu => {
     const key = `${cpu.UID}-${cpu.PID}-${cpu.TID}`;
     const mem = filteredMem.find(m => `${m.UID}-${m.PID}-${m.TID}` === key) || {};
@@ -90,7 +97,6 @@ function scheduleNext() {
   }, delayMs);
 }
 
-// 初始执行
+// 初始执行，并准点每分钟重复
 runOnce();
-// 安排后续准点每分钟执行一次
 scheduleNext();

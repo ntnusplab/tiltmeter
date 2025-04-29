@@ -24,9 +24,9 @@ async function collectMetrics() {
   let idx = cpuHeaderIndex + 1;
   while (idx < lines.length && !lines[idx].includes('minflt/s')) {
     const fields = lines[idx].trim().split(/\s+/);
-    const obj = {};
-    cpuHdr.forEach((h, i) => obj[h] = fields[i]);
-    cpuEntries.push(obj);
+    const entry = {};
+    cpuHdr.forEach((h, i) => entry[h] = fields[i]);
+    cpuEntries.push(entry);
     idx++;
   }
   const filteredCpu = cpuEntries.filter(e => !e.Command.startsWith('|__'));
@@ -39,9 +39,9 @@ async function collectMetrics() {
   idx = memHeaderIndex + 1;
   while (idx < lines.length && lines[idx].trim()) {
     const fields = lines[idx].trim().split(/\s+/);
-    const obj = {};
-    memHdr.forEach((h, i) => obj[h] = fields[i]);
-    memEntries.push(obj);
+    const entry = {};
+    memHdr.forEach((h, i) => entry[h] = fields[i]);
+    memEntries.push(entry);
     idx++;
   }
   const filteredMem = memEntries.filter(e => !e.Command.startsWith('|__'));
@@ -70,11 +70,27 @@ async function collectMetrics() {
   });
 }
 
-(async () => {
+async function runOnce() {
   try {
-    const metrics = await collectMetrics();
-    console.log(JSON.stringify(metrics, null, 2));
+    const threads = await collectMetrics();
+    console.log(JSON.stringify(threads, null, 2));
   } catch (err) {
     console.error('Error:', err.message);
   }
-})();
+}
+
+function scheduleNext() {
+  const now = new Date();
+  const next = new Date(now);
+  next.setMinutes(now.getMinutes() + 1, 0, 0);
+  const delayMs = next - now;
+  setTimeout(async () => {
+    await runOnce();
+    scheduleNext();
+  }, delayMs);
+}
+
+// 初始执行
+runOnce();
+// 安排后续准点每分钟执行一次
+scheduleNext();

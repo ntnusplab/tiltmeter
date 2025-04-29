@@ -1,3 +1,13 @@
+// ==============================
+// CLIENT: thread_report.js (with improved header detection)
+// ==============================
+// 安装依赖：
+//   sudo apt update
+//   sudo apt install -y sysstat nodejs npm
+//   npm install axios
+// 替换 SERVER_URL 为你的服务器地址（如 http://192.168.1.100:5000/metrics）
+
+#!/usr/bin/env node
 const { exec } = require('child_process');
 const util = require('util');
 const axios = require('axios');
@@ -23,8 +33,8 @@ async function collectMetrics() {
     .filter(line => line.trim() && !line.startsWith('Average:'));
   console.log('DEBUG: parsed lines count =', lines.length);
 
-  // 找 CPU 表头（以 "UID" 开头的一行）
-  const cpuHeaderIndex = lines.findIndex(line => line.trim().startsWith('UID'));
+  // 找 CPU 表头：包含 "%usr" 列的那一行
+  const cpuHeaderIndex = lines.findIndex(line => line.includes('%usr'));
   console.log('DEBUG: cpuHeaderIndex =', cpuHeaderIndex);
   if (cpuHeaderIndex < 0) {
     console.error('DEBUG: 无法找到 CPU 表头，以下是所有行：');

@@ -4,25 +4,19 @@ const util = require('util');
 const execAsync = util.promisify(exec);
 
 async function collectMetrics() {
-  let stdout;
-  try {
-    // 使用 -p ALL 确保列出所有线程
-    ({ stdout } = await execAsync('pidstat -u -r -t -p ALL 1 1'));
-  } catch (err) {
-    console.error('Error: pidstat 执行失败:', err);
-    throw err;
-  }
+  // 列出所有线程并采样一次 CPU 和内存
+  const { stdout } = await execAsync('pidstat -u -r -t -p ALL 1 1');
 
   const lines = stdout
     .split('\n')
     .filter(line => line.trim() && !line.startsWith('Average:'));
 
-  // 找到包含 %usr 的 CPU 表头
+  // 找到 CPU 表头行
   const cpuHeaderIndex = lines.findIndex(line => line.includes('%usr'));
   if (cpuHeaderIndex < 0) throw new Error('无法找到 CPU 表头');
   const cpuHdr = lines[cpuHeaderIndex].trim().split(/\s+/);
 
-  // 解析 CPU 数据行，直到遇到 Memory 表头
+  // 解析 CPU 数据直到 Memory 表头
   const cpuEntries = [];
   let idx = cpuHeaderIndex + 1;
   while (idx < lines.length && !lines[idx].includes('minflt/s')) {
@@ -32,15 +26,15 @@ async function collectMetrics() {
     cpuEntries.push(entry);
     idx++;
   }
-  // 过滤子命令行
-  const filteredCpu = cpuEntries.filter(e => !e.Command.startsWith('|__'));
+  // 过滤子线程，仅保留主线程
+  const mainThreads = cpuEntries.filter(e => !e.Command.startsWith('|__'));
 
-  // 找 Memory 表头
+  // 找到 Memory 表头（供后续使用，但这里不提取 I/O 数据）
   const memHeaderIndex = lines.findIndex(line => line.includes('minflt/s'));
   if (memHeaderIndex < 0) throw new Error('无法找到 Memory 表头');
   const memHdr = lines[memHeaderIndex].trim().split(/\s+/);
 
-  // 解析 Memory 数据行
+  // 解析 Memory 数据
   const memEntries = [];
   idx = memHeaderIndex + 1;
   while (idx < lines.length && lines[idx].trim()) {
@@ -50,37 +44,38 @@ async function collectMetrics() {
     memEntries.push(entry);
     idx++;
   }
-  const filteredMem = memEntries.filter(e => !e.Command.startsWith('|__'));
+  // 过滤子线程
+  const mainMem = memEntries.filter(e => !e.Command.startsWith('|__'));
 
-  // 合并并返回 JSON 数组
-  return filteredCpu.map(cpu => {
+  // 合并为键值对，command: metrics
+  const data = {};
+  for (const cpu of mainThreads) {
     const key = `${cpu.UID}-${cpu.PID}-${cpu.TID}`;
-    const mem = filteredMem.find(m => `${m.UID}-${m.PID}-${m.TID}` === key) || {};
-    return {
-      timestamp: new Date().toISOString(),
-      uid: cpu.UID,
-      pid: cpu.PID,
-      tid: cpu.TID,
-      command: cpu.Command,
+    const mem = mainMem.find(m => `${m.UID}-${m.PID}-${m.TID}` === key) || {};
+    data[cpu.Command] = {
       cpu_usr: cpu['%usr'],
       cpu_system: cpu['%system'],
       cpu_guest: cpu['%guest'],
       cpu_wait: cpu['%wait'],
       cpu_total: cpu['%CPU'],
       cpu_core: cpu.CPU,
-      minflt_per_s: mem['minflt/s'],
-      majflt_per_s: mem['majflt/s'],
       vsz_kb: mem.VSZ,
       rss_kb: mem.RSS,
       mem_percent: mem['%MEM']
     };
-  });
+  }
+
+  return data;
 }
 
 async function runOnce() {
   try {
-    const threads = await collectMetrics();
-    console.log(JSON.stringify(threads, null, 2));
+    const data = await collectMetrics();
+    const report = {
+      time: new Date().toISOString(),
+      data
+    };
+    console.log(JSON.stringify(report, null, 2));
   } catch (err) {
     console.error('Error:', err.message);
   }
@@ -97,6 +92,6 @@ function scheduleNext() {
   }, delayMs);
 }
 
-// 初始执行，并准点每分钟重复
+// 初始执行，并在每分钟整点重复
 runOnce();
 scheduleNext();

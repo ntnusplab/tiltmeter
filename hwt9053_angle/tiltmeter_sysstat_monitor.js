@@ -1,7 +1,3 @@
-// ==============================
-// CLIENT: thread_report.js (subcommand filter, no Average)
-// ==============================
-#!/usr/bin/env node
 const { exec } = require('child_process');
 const util = require('util');
 const axios = require('axios');

@@ -6,15 +6,36 @@ const execAsync = util.promisify(exec);
 const SERVER_URL = 'http://<SERVER_IP>:5000/metrics';
 
 async function collectMetrics() {
-  const { stdout } = await execAsync('pidstat -u -r -t 1 1');
+  // 执行 pidstat 并获取原始输出
+  let stdout;
+  try {
+    ({ stdout } = await execAsync('pidstat -u -r -t 1 1'));
+  } catch (err) {
+    console.error('DEBUG: pidstat 命令执行失败:', err);
+    throw err;
+  }
+
+  console.log('DEBUG: raw pidstat stdout:\n' + stdout);
+
+  // 分割行并过滤
   const lines = stdout
     .split('\n')
-    .filter(line => line.trim() && !line.startsWith('Average:'));  // 去掉空行和 Average
+    .filter(line => line.trim() && !line.startsWith('Average:'));
+  console.log('DEBUG: parsed lines count =', lines.length);
 
-  // 找 CPU 表头
+  // 找 CPU 表头（以 "UID" 开头的一行）
   const cpuHeaderIndex = lines.findIndex(line => line.trim().startsWith('UID'));
-  if (cpuHeaderIndex < 0) throw new Error('无法找到 CPU 表头');
+  console.log('DEBUG: cpuHeaderIndex =', cpuHeaderIndex);
+  if (cpuHeaderIndex < 0) {
+    console.error('DEBUG: 无法找到 CPU 表头，以下是所有行：');
+    lines.forEach((l, i) => console.error(i, l));
+    throw new Error('无法找到 CPU 表头');
+  }
+
   const cpuHdr = lines[cpuHeaderIndex].trim().split(/\s+/);
+  console.log('DEBUG: CPU header =', cpuHdr);
+
+  // 收集 CPU 数据行
   const cpuEntries = [];
   let idx = cpuHeaderIndex + 1;
   while (idx < lines.length && lines[idx].trim() && !lines[idx].includes('minflt/s')) {
@@ -24,11 +45,20 @@ async function collectMetrics() {
     cpuEntries.push(obj);
     idx++;
   }
+  console.log('DEBUG: cpuEntries count =', cpuEntries.length);
 
-  // 找 mem 表头
+  // 找 Memory 表头
   const memHeaderIndex = lines.findIndex(line => line.includes('minflt/s'));
-  if (memHeaderIndex < 0) throw new Error('无法找到 Memory 表头');
+  console.log('DEBUG: memHeaderIndex =', memHeaderIndex);
+  if (memHeaderIndex < 0) {
+    console.error('DEBUG: 无法找到 Memory 表头，以下是所有行：');
+    lines.forEach((l, i) => console.error(i, l));
+    throw new Error('无法找到 Memory 表头');
+  }
   const memHdr = lines[memHeaderIndex].trim().split(/\s+/);
+  console.log('DEBUG: Memory header =', memHdr);
+
+  // 收集 Memory 数据行
   const memEntries = [];
   idx = memHeaderIndex + 1;
   while (idx < lines.length && lines[idx].trim()) {
@@ -38,9 +68,10 @@ async function collectMetrics() {
     memEntries.push(obj);
     idx++;
   }
+  console.log('DEBUG: memEntries count =', memEntries.length);
 
-  // 合并数据
-  return cpuEntries.map(cpu => {
+  // 合并 CPU & Memory 数据
+  const metrics = cpuEntries.map(cpu => {
     const key = `${cpu.UID}-${cpu.PID}-${cpu.TID}`;
     const mem = memEntries.find(m => `${m.UID}-${m.PID}-${m.TID}` === key) || {};
     return {
@@ -62,15 +93,26 @@ async function collectMetrics() {
       mem_percent: mem['%MEM']
     };
   });
+
+  console.log('DEBUG: final metrics count =', metrics.length);
+  return metrics;
 }
 
 async function sendMetrics(data) {
-  await axios.post(SERVER_URL, { threads: data }, { timeout: 5000 });
+  try {
+    const resp = await axios.post(SERVER_URL, { threads: data }, { timeout: 5000 });
+    console.log('DEBUG: POST response status =', resp.status);
+  } catch (err) {
+    console.error('DEBUG: POST 失败:', err.message);
+    throw err;
+  }
 }
 
 async function main() {
   try {
+    console.log('DEBUG: collectMetrics start');
     const metrics = await collectMetrics();
+    console.log('DEBUG: sendMetrics start');
     await sendMetrics(metrics);
     console.log(`Sent ${metrics.length} entries`);
   } catch (err) {

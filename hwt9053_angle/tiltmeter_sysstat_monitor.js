@@ -1,13 +1,3 @@
-// ==============================
-// CLIENT: thread_report.js (with improved header detection)
-// ==============================
-// 安装依赖：
-//   sudo apt update
-//   sudo apt install -y sysstat nodejs npm
-//   npm install axios
-// 替换 SERVER_URL 为你的服务器地址（如 http://192.168.1.100:5000/metrics）
-
-#!/usr/bin/env node
 const { exec } = require('child_process');
 const util = require('util');
 const axios = require('axios');

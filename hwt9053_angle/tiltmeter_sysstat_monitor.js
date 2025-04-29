@@ -1,7 +1,10 @@
 const { exec } = require('child_process');
 const util = require('util');
+const axios = require('axios');
 
 const execAsync = util.promisify(exec);
+// 发送目标地址
+const SERVER_URL = 'http://192.168.50.124:8088/metrics';
 
 async function collectMetrics() {
   // 列出所有线程并采样一次 CPU 和内存
@@ -29,7 +32,7 @@ async function collectMetrics() {
   // 过滤子线程，仅保留主线程
   const mainThreads = cpuEntries.filter(e => !e.Command.startsWith('|__'));
 
-  // 找到 Memory 表头（供后续使用，但这里不提取 I/O 数据）
+  // 找到 Memory 表头
   const memHeaderIndex = lines.findIndex(line => line.includes('minflt/s'));
   if (memHeaderIndex < 0) throw new Error('无法找到 Memory 表头');
   const memHdr = lines[memHeaderIndex].trim().split(/\s+/);
@@ -47,7 +50,7 @@ async function collectMetrics() {
   // 过滤子线程
   const mainMem = memEntries.filter(e => !e.Command.startsWith('|__'));
 
-  // 合并为键值对，command: metrics
+  // 合并为 {command: metrics} 结构
   const data = {};
   for (const cpu of mainThreads) {
     const key = `${cpu.UID}-${cpu.PID}-${cpu.TID}`;
@@ -75,7 +78,9 @@ async function runOnce() {
       time: new Date().toISOString(),
       data
     };
+    // 打印并 POST
     console.log(JSON.stringify(report, null, 2));
+    await axios.post(SERVER_URL, report);
   } catch (err) {
     console.error('Error:', err.message);
   }

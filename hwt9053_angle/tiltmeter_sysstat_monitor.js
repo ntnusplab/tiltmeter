@@ -1,3 +1,7 @@
+// ==============================
+// CLIENT: thread_report.js (subcommand filter, no Average)
+// ==============================
+#!/usr/bin/env node
 const { exec } = require('child_process');
 const util = require('util');
 const axios = require('axios');
@@ -6,7 +10,6 @@ const execAsync = util.promisify(exec);
 const SERVER_URL = 'http://<SERVER_IP>:5000/metrics';
 
 async function collectMetrics() {
-  // 执行 pidstat 并获取原始输出
   let stdout;
   try {
     ({ stdout } = await execAsync('pidstat -u -r -t 1 1'));
@@ -15,48 +18,39 @@ async function collectMetrics() {
     throw err;
   }
 
-  console.log('DEBUG: raw pidstat stdout:\n' + stdout);
-
-  // 分割行并过滤
+  // 过滤空行和 Average 行
   const lines = stdout
     .split('\n')
     .filter(line => line.trim() && !line.startsWith('Average:'));
-  console.log('DEBUG: parsed lines count =', lines.length);
 
-  // 找 CPU 表头：包含 "%usr" 列的那一行
+  // 找 CPU 表头
   const cpuHeaderIndex = lines.findIndex(line => line.includes('%usr'));
-  console.log('DEBUG: cpuHeaderIndex =', cpuHeaderIndex);
   if (cpuHeaderIndex < 0) {
-    console.error('DEBUG: 无法找到 CPU 表头，以下是所有行：');
-    lines.forEach((l, i) => console.error(i, l));
+    console.error('DEBUG: 无法找到 CPU 表头');
     throw new Error('无法找到 CPU 表头');
   }
-
   const cpuHdr = lines[cpuHeaderIndex].trim().split(/\s+/);
-  console.log('DEBUG: CPU header =', cpuHdr);
 
-  // 收集 CPU 数据行
+  // 收集 CPU 数据行，直到遇到 Memory 表头
   const cpuEntries = [];
   let idx = cpuHeaderIndex + 1;
-  while (idx < lines.length && lines[idx].trim() && !lines[idx].includes('minflt/s')) {
+  while (idx < lines.length && !lines[idx].includes('minflt/s')) {
     const fields = lines[idx].trim().split(/\s+/);
     const obj = {};
     cpuHdr.forEach((h, i) => obj[h] = fields[i]);
     cpuEntries.push(obj);
     idx++;
   }
-  console.log('DEBUG: cpuEntries count =', cpuEntries.length);
+  // 过滤 subcommand（以 '|__' 开头）
+  const filteredCpu = cpuEntries.filter(e => !e.Command.startsWith('|__'));
 
   // 找 Memory 表头
   const memHeaderIndex = lines.findIndex(line => line.includes('minflt/s'));
-  console.log('DEBUG: memHeaderIndex =', memHeaderIndex);
   if (memHeaderIndex < 0) {
-    console.error('DEBUG: 无法找到 Memory 表头，以下是所有行：');
-    lines.forEach((l, i) => console.error(i, l));
+    console.error('DEBUG: 无法找到 Memory 表头');
     throw new Error('无法找到 Memory 表头');
   }
   const memHdr = lines[memHeaderIndex].trim().split(/\s+/);
-  console.log('DEBUG: Memory header =', memHdr);
 
   // 收集 Memory 数据行
   const memEntries = [];
@@ -68,12 +62,13 @@ async function collectMetrics() {
     memEntries.push(obj);
     idx++;
   }
-  console.log('DEBUG: memEntries count =', memEntries.length);
+  // 同样过滤 subcommand
+  const filteredMem = memEntries.filter(e => !e.Command.startsWith('|__'));
 
-  // 合并 CPU & Memory 数据
-  const metrics = cpuEntries.map(cpu => {
+  // 合并并返回
+  return filteredCpu.map(cpu => {
     const key = `${cpu.UID}-${cpu.PID}-${cpu.TID}`;
-    const mem = memEntries.find(m => `${m.UID}-${m.PID}-${m.TID}` === key) || {};
+    const mem = filteredMem.find(m => `${m.UID}-${m.PID}-${m.TID}` === key) || {};
     return {
       timestamp: new Date().toISOString(),
       uid: cpu.UID,
@@ -93,31 +88,18 @@ async function collectMetrics() {
       mem_percent: mem['%MEM']
     };
   });
-
-  console.log('DEBUG: final metrics count =', metrics.length);
-  return metrics;
 }
 
 async function sendMetrics(data) {
-  try {
-    const resp = await axios.post(SERVER_URL, { threads: data }, { timeout: 5000 });
-    console.log('DEBUG: POST response status =', resp.status);
-  } catch (err) {
-    console.error('DEBUG: POST 失败:', err.message);
-    throw err;
-  }
+  const resp = await axios.post(SERVER_URL, { threads: data }, { timeout: 5000 });
+  console.log(`Sent ${data.length} entries, status ${resp.status}`);
 }
 
-async function main() {
+(async () => {
   try {
-    console.log('DEBUG: collectMetrics start');
     const metrics = await collectMetrics();
-    console.log('DEBUG: sendMetrics start');
-    // await sendMetrics(metrics);
-    // console.log(`Sent ${metrics.length} entries`);
+    await sendMetrics(metrics);
   } catch (err) {
     console.error('Error:', err.message);
   }
-}
-
-main();
+})();

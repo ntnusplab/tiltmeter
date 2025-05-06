@@ -132,7 +132,7 @@ function getWWAN0IP(callback) {
   const onDone = ip => {
     if (done) return;
     done = true;
-    try { port.close(); } catch { }
+    try { port.close(); } catch {} 
     callback(ip);
   };
 
@@ -171,14 +171,19 @@ function getWWAN0IP(callback) {
 }
 
 // GET /connection-status：從 sys.conf 讀取 IP 與 PORT，檢查連線狀態並取得 wwan0 IP
-
 app.get('/connection-status', (req, res) => {
-  // ... 讀 sys.conf 的 IP/PORT ...
-  getWWAN0IP(wwan0IP => {
+  let sysConfig = {};
+  if (fs.existsSync(sysConfPath)) {
+    sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
+  }
+  const IP = sysConfig.IP;
+  const PORT = sysConfig.PORT;
+
+  getWWAN0IP((wwan0IP) => {
     if (!IP || !PORT) {
       return res.json({ connected: false, message: 'sys.conf 中未設定 IP 或 PORT', wwan0IP });
     }
-    exec(`nc -z -v ${IP} ${PORT}`, (error) => {
+    exec(`nc -z -v ${IP} ${PORT}`, (error, stdout, stderr) => {
       if (error) {
         return res.json({ connected: false, message: '網際網路連線中斷', wwan0IP });
       }

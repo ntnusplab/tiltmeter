@@ -36,7 +36,7 @@ fi
 
 # 6. 發送重啟模組指令
 echo "[INFO] 發送模組重啟指令 AT+CFUN=1,1"
-echo -e "AT+CFUN=1,1\r" > "$TTY"
+echo -e "AT+CFUN=1,1" > "$TTY"
 sleep 0.5
 
 echo "[INFO] 4G 模組重啟指令已送出"

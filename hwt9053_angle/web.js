@@ -106,7 +106,7 @@ app.post('/restart_tiltmeter', (req, res) => {
 
 
 // // 取得 wwan0 的 IP 位址
-// function getWWAN0IP(callback) {
+// function getETH0IP(callback) {
 //   exec('ip addr show eth0', (error, stdout, stderr) => {
 //     if (error) {
 //       return callback(null);
@@ -120,34 +120,39 @@ app.post('/restart_tiltmeter', (req, res) => {
 //   });
 // }
 
-function getWWAN0IP(callback) {
-  const tty = '/dev/ttyUSB2';  // 請確認你的 AT 控制埠
-  const cmd = [
-    // 1. 設定序列埠參數
-    `stty -F ${tty} raw 115200 -echo`,
-    // 2. 丟出 AT 指令（注意 \r）
-    `echo -e "AT+CGPADDR=1\r" > ${tty}`,
-    // 3. 等待模組回應
-    `sleep 0.5`,
-    // 4. 只讀一行回應，避免 cat 卡住
-    `head -n 1 ${tty}`
-  ].join(' && ');
+function getETH0IP(callback) {
+  const tty = '/dev/ttyUSB2'   // 請依實際情況修改
+  const port = new SerialPort(tty, {
+    baudRate: 115200,
+    dataBits: 8,
+    stopBits: 1,
+    parity: 'none',
+    autoOpen: false,
+  })
 
-  exec(cmd, { timeout: 3000 }, (error, stdout, stderr) => {
-    if (error) {
-      console.error('AT 查詢失敗：', error);
-      return callback(null);
+  port.open(err => {
+    if (err) {
+      console.error('開啟序列埠失敗：', err.message)
+      return callback(null)
     }
 
-    // stdout 範例: +CGPADDR: 1,"10.64.0.5"
-    const match = stdout.match(/\+CGPADDR:\s*\d+,"(\d+\.\d+\.\d+\.\d+)"/);
-    if (match) {
-      callback(match[1]);
-    } else {
-      console.warn('無法解析 PDP IP，原始回應：', stdout.trim());
-      callback(null);
-    }
-  });
+    const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }))
+    // 收到第一行回應就處理
+    parser.once('data', line => {
+      const m = line.match(/\+CGPADDR:\s*\d+,"(\d+\.\d+\.\d+\.\d+)"/)
+      port.close()        // 處理完記得關 port
+      callback(m ? m[1] : null)
+    })
+
+    // 送出 AT 指令
+    port.write('AT+CGPADDR=1\r', writeErr => {
+      if (writeErr) {
+        console.error('送出 AT 指令失敗：', writeErr.message)
+        port.close()
+        callback(null)
+      }
+    })
+  })
 }
 
 // GET /connection-status：從 sys.conf 讀取 IP 與 PORT，檢查連線狀態並取得 wwan0 IP
@@ -159,7 +164,7 @@ app.get('/connection-status', (req, res) => {
   const IP = sysConfig.IP;
   const PORT = sysConfig.PORT;
 
-  getWWAN0IP((wwan0IP) => {
+  getETH0IP((wwan0IP) => {
     if (!IP || !PORT) {
       return res.json({ connected: false, message: 'sys.conf 中未設定 IP 或 PORT', wwan0IP });
     }
@@ -171,6 +176,7 @@ app.get('/connection-status', (req, res) => {
     });
   });
 });
+
 app.post('/restart_network', (req, res) => {
   const portPath = '/dev/ttyUSB2'; // 根據你的實際連接埠調整
   const baudRate = 115200;

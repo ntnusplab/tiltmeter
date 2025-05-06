@@ -3,33 +3,30 @@
 
 set -euo pipefail
 
-# 參數：DEVICE 波特率 TIMEOUT
-DEVICE=/dev/ttyUSB2
-BAUD=115200
+DEVICE=${1:-/dev/ttyUSB2}
+BAUD=${2:-115200}
 TIMEOUT=${3:-3}
 
-# 1. 用最簡單的方式 config serial：raw 模式、指定波特率、關閉 echo
-stty -F "$DEVICE" raw speed "$BAUD" -echo
+# 1. 嘗試只設定波特率，忽略所有輸出
+stty -F "$DEVICE" "$BAUD" >/dev/null 2>&1 || true
 
-# 2. 以 fd3 同時開啟讀寫
+# 2. 開啟讀寫
 exec 3<>"$DEVICE"
 
-# 3. 送出 AT 指令
-printf "AT+CGPADDR\r" >&3
+# 3. 送 AT 指令要求 IP（Context 1）
+printf 'AT+CGPADDR\r\n' >&3
 
-# 4. 讀取回應（遇到 OK/ERROR 就停止，或超過 TIMEOUT 秒結束）
+# 4. 用 timeout 讀整段回應，碰到 OK/ERROR 就跳出
 RESPONSE=""
 while IFS= read -r -t "$TIMEOUT" LINE <&3; do
   RESPONSE+="$LINE"$'\n'
-  # 收到 OK 或 ERROR 就跳出
   [[ "$LINE" == "OK" || "$LINE" == "ERROR" ]] && break
 done
 
-# 關掉 fd3
-exec 3>&-
-exec 3<&-
+# 5. 關掉 fd3
+exec 3>&-; exec 3<&-
 
-# 5. 解析出 Context 1 的 IP
+# 6. 解析並輸出 IP
 if [[ $RESPONSE =~ \+CGPADDR:\ 1,\"([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\" ]]; then
   echo "${BASH_REMATCH[1]}"
   exit 0

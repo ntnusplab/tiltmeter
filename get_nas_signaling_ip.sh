@@ -4,8 +4,8 @@
 set -euo pipefail
 
 # 參數：DEVICE 波特率 TIMEOUT
-DEVICE=${1:-/dev/ttyUSB2}
-BAUD=${2:-115200}
+DEVICE=/dev/ttyUSB2
+BAUD=115200
 TIMEOUT=${3:-3}
 
 # 1. 用最簡單的方式 config serial：raw 模式、指定波特率、關閉 echo

@@ -125,7 +125,7 @@ function getWWAN0IP(callback) {
   // 注意：根據你的系統實際序列埠檔名調整 /dev/ttyUSB2
   const cmd = [
     // 1) 送出 AT 指令
-    'echo -e "AT+CGPADDR=1\\r" > /dev/ttyUSB2',
+    'echo -e "AT+CGPADDR=1" > /dev/ttyUSB2',
     // 2) 等一下 modem 回應
     'sleep 0.2',
     // 3) 讀序列埠輸出

@@ -106,57 +106,75 @@ app.post('/restart_tiltmeter', (req, res) => {
   });
 });
 
-// 1. 取得 eth0 上真正從 4G 模組那邊透過 NAS/DHCP NAT 分來的 IP
-function getETH0IP() {
-  const nets = os.networkInterfaces();
-  const eth0 = nets['eth0'] || [];
-  for (const addr of eth0) {
-    if (addr.family === 'IPv4' && !addr.internal) {
-      return Promise.resolve(addr.address);
-    }
-  }
-  // 如果 eth0 沒拿到，再掃描其他介面
-  for (const name of Object.keys(nets)) {
-    for (const addr of nets[name]) {
-      if (addr.family === 'IPv4' && !addr.internal) {
-        return Promise.resolve(addr.address);
+// 取代 getETH0IP()：直接發 AT+CGPADDR=1 給 modem
+function getModemIP() {
+  return new Promise((resolve, reject) => {
+    const port = new SerialPort('/dev/ttyUSB2', {
+      baudRate: 115200,
+      autoOpen: true,
+      dataBits: 8,
+      stopBits: 1,
+      parity: 'none',
+    });
+    const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
+
+    let timeout = setTimeout(() => {
+      port.close();
+      reject(new Error('AT 指令無回應'));
+    }, 3000);
+
+    parser.on('data', line => {
+      // 範例回應： +CGPADDR: 1,"10.64.123.45"
+      if (line.startsWith('+CGPADDR:')) {
+        clearTimeout(timeout);
+        port.close();
+        const m = line.match(/"(.+?)"/);
+        if (m) return resolve(m[1]);
       }
-    }
-  }
-  return Promise.resolve(null);
+      // 也可監聽 OK / ERROR 來結束
+      if (line === 'OK') {
+        clearTimeout(timeout);
+        port.close();
+        // 如果還沒 match IP，就回 null
+        return resolve(null);
+      }
+      if (line === 'ERROR') {
+        clearTimeout(timeout);
+        port.close();
+        return reject(new Error('modem 回錯誤'));
+      }
+    });
+
+    // 先關 echo（選擇性）
+    port.write('ATE0\r');
+    // 然後要求 PDP Context 1 的 IP
+    port.write('AT+CGPADDR=1\r');
+  });
 }
 
-// 2. POST /connection-status: 從 body 拿 IP/PORT，ping 遠端、回傳 eth0IP
+// 在 /connection-status 裡改用 getModemIP()
 app.post('/connection-status', async (req, res) => {
   const { IP, PORT } = req.body;
   if (!IP || !PORT) {
-    return res.status(400).json({
-      connected: false,
-      message: '請提供 IP 與 PORT'
-    });
+    return res.status(400).json({ connected: false, message: '請提供 IP 與 PORT' });
   }
 
-  const eth0IP = await getETH0IP();
+  let eth0IP;
+  try {
+    eth0IP = await getModemIP();
+  } catch (e) {
+    console.error('getModemIP error:', e);
+    return res.status(500).json({ connected: false, message: '無法從 modem 取得 IP' });
+  }
   if (!eth0IP) {
-    return res.status(500).json({
-      connected: false,
-      message: '無法取得 eth0 IP'
-    });
+    return res.json({ connected: false, message: 'modem 尚未分配 IP', eth0IP: null });
   }
 
   exec(`nc -z -v ${IP} ${PORT}`, (err) => {
     if (err) {
-      return res.json({
-        connected: false,
-        message: '與遠端主機連線失敗',
-        eth0IP
-      });
+      return res.json({ connected: false, message: '與遠端主機連線失敗', eth0IP });
     }
-    res.json({
-      connected: true,
-      message: '連線測試成功',
-      eth0IP
-    });
+    res.json({ connected: true, message: '連線測試成功', eth0IP });
   });
 });
 

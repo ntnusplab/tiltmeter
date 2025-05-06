@@ -132,25 +132,69 @@ function updateConfig(key, value) {
     .catch(err => console.error('Error:', err));
 }
 
-// 檢查網際網路連線狀況
-function checkConnectionStatus() {
-  fetch('/connection-status')
-    .then(res => res.json())
-    .then(data => {
-      const statusEl = document.getElementById('connectionStatus');
-      let text = data.message;
-      if (data.wwan0IP) {
-        text += " (IP: " + data.wwan0IP + ")";
-      }
-      statusEl.innerText = text;
-      statusEl.style.color = data.connected ? 'green' : 'red';
-    })
-    .catch(err => {
-      console.error('Error:', err);
-      document.getElementById('connectionStatus').innerText = '無法取得連線狀態';
-      document.getElementById('connectionStatus').style.color = 'red';
+// // 檢查網際網路連線狀況
+// function checkConnectionStatus() {
+//   fetch('/connection-status')
+//     .then(res => res.json())
+//     .then(data => {
+//       const statusEl = document.getElementById('connectionStatus');
+//       let text = data.message;
+//       if (data.wwan0IP) {
+//         text += " (IP: " + data.wwan0IP + ")";
+//       }
+//       statusEl.innerText = text;
+//       statusEl.style.color = data.connected ? 'green' : 'red';
+//     })
+//     .catch(err => {
+//       console.error('Error:', err);
+//       document.getElementById('connectionStatus').innerText = '無法取得連線狀態';
+//       document.getElementById('connectionStatus').style.color = 'red';
+//     });
+// }
+
+async function checkConnectionStatus() {
+  const statusEl = document.getElementById('connectionStatus');
+  // 假設你有兩個 input 讓使用者填 IP 與 PORT
+  const ipInput = document.getElementById('ipInput').value;
+  const portInput = document.getElementById('portInput').value;
+
+  try {
+    const res = await fetch('/connection-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ IP: ipInput, PORT: portInput })
     });
+
+    // 嘗試把回應讀成文字，再解析成 JSON
+    const text = await res.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(`回傳不是 JSON：${text}`);
+    }
+
+    // HTTP 狀態碼 200-299 以外都當錯誤處理
+    if (!res.ok) {
+      const errMsg = data.message || data.error || `HTTP ${res.status}`;
+      throw new Error(errMsg);
+    }
+
+    // 成功時
+    let msg = data.message || '未知狀態';
+    if (data.wwan0IP) {
+      msg += ` (IP: ${data.wwan0IP})`;
+    }
+    statusEl.innerText = msg;
+    statusEl.style.color = data.connected ? 'green' : 'red';
+
+  } catch (err) {
+    console.error('Connection check failed:', err);
+    statusEl.innerText = `錯誤：${err.message}`;
+    statusEl.style.color = 'red';
+  }
 }
+
 
 setInterval(checkConnectionStatus, 10000);
 document.getElementById('refreshConnectionBtn').addEventListener('click', checkConnectionStatus);

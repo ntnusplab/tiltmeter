@@ -11,6 +11,7 @@ const { SerialPort } = require('serialport');
 const { ReadlineParser } = require('@serialport/parser-readline');
 const server = http.createServer(app);
 const PORT = 8080;
+const os = require('os');
 
 app.use(express.static('public'));
 app.use(express.json());

@@ -180,7 +180,7 @@ app.post('/connection-status', async (req, res) => {
     console.log(`+++ 與 ${remoteIP}:${remotePort} 連線成功`);
     res.json({
       connected: true,
-      message: `連線到 ${remoteIP}:${remotePort} 成功`,
+      message: `連線成功`,
       wwan0IP
     });
   });

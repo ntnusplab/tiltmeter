@@ -6,7 +6,7 @@ while true; do
     ip_addr=$(ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
     
     if [ -n "$ip_addr" ]; then
-        echo "檢測到 wwan0 的 IPv4 地址：$ip_addr"
+        echo "檢測到 eth0 的 IPv4 地址：$ip_addr"
         echo "開始重啟 systemd-timesyncd 服務..."
         sudo systemctl restart systemd-timesyncd.service
         sudo pm2 restart 1

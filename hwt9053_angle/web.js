@@ -120,57 +120,65 @@ app.post('/restart_tiltmeter', (req, res) => {
 //   });
 // }
 
-function getETH0IP(callback) {
-  const tty = '/dev/ttyUSB2';  // 改成你的 AT 控制埠
-  // 這裡必須傳一個 options 物件，裡面包含 path
+function getWWAN0IP(callback) {
+  const tty = '/dev/ttyUSB2';  // AT 控制埠
   const port = new SerialPort({
     path: tty,
     baudRate: 115200,
-    dataBits: 8,
-    stopBits: 1,
-    parity: 'none',
     autoOpen: false,
   });
+
+  let done = false;
+  const onDone = ip => {
+    if (done) return;
+    done = true;
+    try { port.close(); } catch { }
+    callback(ip);
+  };
 
   port.open(err => {
     if (err) {
       console.error('開啟序列埠失敗：', err.message);
-      return callback(null);
+      return onDone(null);
     }
 
     const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
-    // 收到第一行回應就處理
-    parser.once('data', line => {
-      const m = line.match(/\+CGPADDR:\s*\d+,"(\d+\.\d+\.\d+\.\d+)"/);
-      port.close();         // 處理完記得關 port
-      callback(m ? m[1] : null);
-    });
-
-    // 送出 AT 指令
-    port.write('AT+CGPADDR=1\r', writeErr => {
-      if (writeErr) {
-        console.error('送出 AT 指令失敗：', writeErr.message);
-        port.close();
-        callback(null);
+    parser.on('data', line => {
+      // 如果你想除錯，可以先打出所有回傳：
+      // console.log('<<', line);
+      const m = line.match(/\+CGPADDR:\s*\d+,"?(\d+\.\d+\.\d+\.\d+)"?/);
+      if (m) {
+        onDone(m[1]);
       }
     });
+
+    // 清空任何殘留資料，再送指令
+    port.flush(flushErr => {
+      if (flushErr) {
+        console.warn('flush 失敗，繼續寫指令');
+      }
+      port.write('AT+CGPADDR=1\r', writeErr => {
+        if (writeErr) {
+          console.error('送出 AT 指令失敗：', writeErr.message);
+          onDone(null);
+        }
+      });
+    });
+
+    // 2 秒後若沒回應，就收尾
+    setTimeout(() => onDone(null), 2000);
   });
 }
 
 // GET /connection-status：從 sys.conf 讀取 IP 與 PORT，檢查連線狀態並取得 wwan0 IP
-app.get('/connection-status', (req, res) => {
-  let sysConfig = {};
-  if (fs.existsSync(sysConfPath)) {
-    sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
-  }
-  const IP = sysConfig.IP;
-  const PORT = sysConfig.PORT;
 
-  getETH0IP((wwan0IP) => {
+app.get('/connection-status', (req, res) => {
+  // ... 讀 sys.conf 的 IP/PORT ...
+  getWWAN0IP(wwan0IP => {
     if (!IP || !PORT) {
       return res.json({ connected: false, message: 'sys.conf 中未設定 IP 或 PORT', wwan0IP });
     }
-    exec(`nc -z -v ${IP} ${PORT}`, (error, stdout, stderr) => {
+    exec(`nc -z -v ${IP} ${PORT}`, (error) => {
       if (error) {
         return res.json({ connected: false, message: '網際網路連線中斷', wwan0IP });
       }

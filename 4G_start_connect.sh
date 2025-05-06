@@ -1,42 +1,52 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+# get_nas_signaling_ip.sh — 从 ttyUSB2 发 AT+CGPADDR 并回 Context 1 的 IP
+# 并用 flock 防止重入、先清空残余数据
 
-# 1. 停止任何現存的 4G 連線程式
-pkill -f pppd       || true
-pkill -f qmicli     || true
-pkill -f waveshare-CM || true
+LOCKFILE=/var/lock/get_nas_signaling_ip.lock
 
-# 2. 載入 APN 設定
-source /home/admin/tiltmeter/sys.conf
-# sys.conf 範例：
-#   APN="internet.iot"
-#   PDP_CID=1
+(
+  # 独占锁，最多等 5 秒
+  flock -x -w 5 200 || {
+    echo "Error: 无法取得串口锁，另一线程仍在操作" >&2
+    exit 1
+  }
 
-# 3. 指定 AT 埠
-TTY="/dev/ttyUSB2"
-CID="${PDP_CID:-1}"
+  set -euo pipefail
 
-echo "[INFO] 設定 PDP Context ${CID} APN 為: ${APN}"
-echo "[INFO] 使用序列埠: ${TTY}"
+  DEVICE=${1:-/dev/ttyUSB2}
+  BAUD=${2:-115200}
+  TIMEOUT=${3:-3}
 
-# 4. 發出 AT+CGDCONT 設定 APN
-echo -e "AT+CGDCONT=${CID},\"IP\",\"${APN}\"\r" > "$TTY"
-sleep 0.5
+  # 1. 设定波特率（忽略错误输出）
+  stty -F "$DEVICE" "$BAUD" >/dev/null 2>&1 || true
 
-# 5. 查詢並讀回 CGDCONT 回應（最多等 2 秒）
-echo -e "AT+CGDCONT?\r" > "$TTY"
-RESPONSE=$(timeout 2 cat "$TTY" || true)
+  # 2. 打开读/写
+  exec 3<>"$DEVICE"
 
-if echo "$RESPONSE" | grep -q "+CGDCONT.*${CID}"; then
-  LINE=$(echo "$RESPONSE" | grep "+CGDCONT.*${CID}")
-  echo "[INFO] CGDCONT 回應: ${LINE}"
-else
-  echo "[WARN] 未讀到 CGDCONT 回應 (CID=${CID})"
-fi
+  # 3. **清空输入缓冲区**：把所有残余数据读走
+  timeout 0.1 cat <&3 >/dev/null 2>&1 || true
 
-# 6. 發送重啟模組指令
-echo "[INFO] 發送模組重啟指令 AT+CFUN=1,1"
-echo -e "AT+CFUN=1,1\r" > "$TTY"
-sleep 0.5
+  # 4. 发送 AT+CGPADDR
+  printf 'AT+CGPADDR\r\n' >&3
 
-echo "[INFO] 4G 模組重啟指令已送出"
+  # 5. 读回馈，碰到 OK/ERROR 就停止
+  RESPONSE=""
+  while IFS= read -r -t "$TIMEOUT" LINE <&3; do
+    RESPONSE+="$LINE"$'\n'
+    [[ "$LINE" == "OK" || "$LINE" == "ERROR" ]] && break
+  done
+
+  # 6. 关闭 fd3
+  exec 3>&-; exec 3<&-
+
+  # 7. 解析并输出 IP
+  if [[ $RESPONSE =~ \+CGPADDR:\ 1,\"([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)\" ]]; then
+    echo "${BASH_REMATCH[1]}"
+    exit 0
+  else
+    echo "Error: 无法取得 IP，模块回馈：" >&2
+    echo "$RESPONSE" >&2
+    exit 1
+  fi
+
+) 200>"$LOCKFILE"

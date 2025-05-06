@@ -152,7 +152,7 @@ function checkConnectionStatus() {
     });
 }
 
-setInterval(checkConnectionStatus, 60000);
+setInterval(checkConnectionStatus, 10000);
 document.getElementById('refreshConnectionBtn').addEventListener('click', checkConnectionStatus);
 document.getElementById('refreshConfigBtn').addEventListener('click', loadConfig);
 

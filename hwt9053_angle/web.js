@@ -4,7 +4,7 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { exec, spawn } = require('child_process');
 const app = express();
 const http = require('http');
 const { SerialPort } = require('serialport');
@@ -13,6 +13,7 @@ const server = http.createServer(app);
 const PORT = 8080;
 
 app.use(express.static('public'));
+app.use(express.json());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -104,119 +105,81 @@ app.post('/restart_tiltmeter', (req, res) => {
   });
 });
 
-
-// // 取得 wwan0 的 IP 位址
-// function getETH0IP(callback) {
-//   exec('ip addr show eth0', (error, stdout, stderr) => {
-//     if (error) {
-//       return callback(null);
-//     }
-//     const match = stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
-//     if (match) {
-//       callback(match[1]);
-//     } else {
-//       callback(null);
-//     }
-//   });
-// }
-function getWWAN0IP(callback) {
-  const tty = '/dev/ttyUSB2';
-  const port = new SerialPort({
-    path: tty,
-    baudRate: 115200,
-    autoOpen: false,
-    lock: false,        // <- 跳过系统 lockfile
-  });
-
-  let done = false;
-  function safeClose() {
-    if (port.isOpen) {
-      port.close(err => {
-        if (err && err.message !== 'Port is not open')
-          console.error('關閉序列埠錯誤:', err.message);
-      });
+// 1. 取得 eth0 上真正從 4G 模組那邊透過 NAS/DHCP NAT 分來的 IP
+function getETH0IP() {
+  const nets = os.networkInterfaces();
+  const eth0 = nets['eth0'] || [];
+  for (const addr of eth0) {
+    if (addr.family === 'IPv4' && !addr.internal) {
+      return Promise.resolve(addr.address);
     }
   }
-
-  function finish(ip) {
-    if (done) return;
-    done = true;
-    safeClose();
-    callback(ip);
-  }
-
-  port.open(err => {
-    if (err) {
-      console.error('開啟序列埠失敗：', err.message);
-      return finish(null);
+  // 如果 eth0 沒拿到，再掃描其他介面
+  for (const name of Object.keys(nets)) {
+    for (const addr of nets[name]) {
+      if (addr.family === 'IPv4' && !addr.internal) {
+        return Promise.resolve(addr.address);
+      }
     }
-
-    const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
-    parser.on('data', line => {
-      const m = line.match(/\+CGPADDR:\s*\d+,"?(\d+\.\d+\.\d+\.\d+)"?/);
-      if (m) finish(m[1]);
-    });
-
-    port.flush(() => {
-      port.write('AT+CGPADDR=1\r', wrErr => {
-        if (wrErr) {
-          console.error('送出 AT 失敗：', wrErr.message);
-          finish(null);
-        }
-      });
-    });
-
-    // 2 秒超時
-    setTimeout(() => finish(null), 2000);
-  });
-
-  // 也可以在这里捕捉 error 事件
-  port.on('error', err => {
-    console.error('串口錯誤：', err.message);
-    finish(null);
-  });
+  }
+  return Promise.resolve(null);
 }
 
-// GET /connection-status：從 sys.conf 讀取 IP 與 PORT，檢查連線狀態並取得 wwan0 IP
-app.get('/connection-status', (req, res) => {
-  let sysConfig = {};
-  if (fs.existsSync(sysConfPath)) {
-    sysConfig = parseConfig(fs.readFileSync(sysConfPath, 'utf8'));
+// 2. POST /connection-status: 從 body 拿 IP/PORT，ping 遠端、回傳 eth0IP
+app.post('/connection-status', async (req, res) => {
+  const { IP, PORT } = req.body;
+  if (!IP || !PORT) {
+    return res.status(400).json({
+      connected: false,
+      message: '請提供 IP 與 PORT'
+    });
   }
-  const IP = sysConfig.IP;
-  const PORT = sysConfig.PORT;
 
-  getWWAN0IP((wwan0IP) => {
-    if (!IP || !PORT) {
-      return res.json({ connected: false, message: 'sys.conf 中未設定 IP 或 PORT', wwan0IP });
+  const eth0IP = await getETH0IP();
+  if (!eth0IP) {
+    return res.status(500).json({
+      connected: false,
+      message: '無法取得 eth0 IP'
+    });
+  }
+
+  exec(`nc -z -v ${IP} ${PORT}`, (err) => {
+    if (err) {
+      return res.json({
+        connected: false,
+        message: '與遠端主機連線失敗',
+        eth0IP
+      });
     }
-    exec(`nc -z -v ${IP} ${PORT}`, (error, stdout, stderr) => {
-      if (error) {
-        return res.json({ connected: false, message: '網際網路連線中斷', wwan0IP });
-      }
-      res.json({ connected: true, message: '網際網路連線正常', wwan0IP });
+    res.json({
+      connected: true,
+      message: '連線測試成功',
+      eth0IP
     });
   });
 });
 
+// 3. POST /restart_network: 執行 ../mbim_start_connect.sh 並回傳完整日誌
 app.post('/restart_network', (req, res) => {
-  const script = '/home/admin/tiltmeter/mbim_start_connect.sh';
+  const scriptPath = path.join(__dirname, '..', 'mbim_start_connect.sh');
+  const proc = spawn('bash', [scriptPath]);
+  let log = '';
 
-  exec(`bash ${script}`, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`執行重啟腳本失敗：${error}`);
-      return res.json({
+  proc.stdout.on('data', data => log += data.toString());
+  proc.stderr.on('data', data => log += data.toString());
+
+  proc.on('close', code => {
+    if (code !== 0) {
+      return res.status(500).json({
         success: false,
-        message: `執行腳本失敗：${error.message}`,
-        stderr: stderr.trim()
+        message: `腳本執行失敗 (code=${code})`,
+        output: log.trim()
       });
     }
-
-    console.log(`重啟腳本輸出：\n${stdout}`);
     res.json({
       success: true,
-      message: '4G 模組 APN 已更新並發送重啟指令',
-      output: stdout.trim()
+      message: '4G 模組 APN 已更新並重新啟動',
+      output: log.trim()
     });
   });
 });

@@ -32,13 +32,9 @@ sleep 0.5
 # 只印包含 +CGDCONT 且包含你指定 CID 的那一行
 grep "+CGDCONT" < "$TTY" | grep "${CID}"
 
-# 7. 恢復序列埠 echo（可選）
-stty -F "$TTY" echo
-
 # ————————————
 # 8. 在更新 APN 之後，發送重啟模組指令
 echo "◆ 發送模組重啟指令 (AT+CFUN=1,1)..."
-stty -F "$TTY" raw cs8 115200 -echo    # 再次確保 port 設定正確
 echo -e "AT+CFUN=1,1\r" > "$TTY"
 sleep 0.5
 stty -F "$TTY" echo

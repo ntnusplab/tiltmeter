@@ -13,7 +13,7 @@ source /home/admin/tiltmeter/sys.conf
 #   PDP_CID=1
 
 # 3. 指定 AT 埠
-TTY="/dev/ttyUSB3"
+TTY="/dev/ttyUSB2"
 CID="${PDP_CID:-1}"
 
 echo "[INFO] 設定 PDP Context ${CID} APN 為: ${APN}"

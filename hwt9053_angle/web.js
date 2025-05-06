@@ -128,6 +128,7 @@ app.post('/connection-status', async (req, res) => {
   let wwan0IP;
   try {
     wwan0IP = await getModemIP();
+    console.log('取得的 WWAN0 IP：', wwan0IP);
   } catch (e) {
     console.error('取得 NAS IP 失敗：', e);
     return res.status(500).json({ connected: false, message: '從 modem 取得 IP 失敗' });

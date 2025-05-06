@@ -180,7 +180,7 @@ async function checkConnectionStatus() {
     console.log('解析後 JSON：', data);
     let msg = data.message || '未知狀態';
     if (data.wwan0IP) {
-      msg += ` (WWAN IP: ${data.wwan0IP})`;
+      msg += ` IP:${data.wwan0IP}`;
     }
     statusEl.innerText = msg;
     statusEl.style.color = data.connected ? 'green' : 'red';

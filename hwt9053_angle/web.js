@@ -121,28 +121,30 @@ app.post('/restart_tiltmeter', (req, res) => {
 // }
 
 function getWWAN0IP(callback) {
-  // 把 AT 指令送到 /dev/ttyUSB2，再讀一次回傳內容
-  // 注意：根據你的系統實際序列埠檔名調整 /dev/ttyUSB2
+  const tty = '/dev/ttyUSB2';  // 請確認你的 AT 控制埠
   const cmd = [
-    // 1) 送出 AT 指令
-    'echo -e "AT+CGPADDR=1" > /dev/ttyUSB2',
-    // 2) 等一下 modem 回應
-    'sleep 0.2',
-    // 3) 讀序列埠輸出
-    'cat /dev/ttyUSB2'
+    // 1. 設定序列埠參數
+    `stty -F ${tty} raw 115200 -echo`,
+    // 2. 丟出 AT 指令（注意 \r）
+    `echo -e "AT+CGPADDR=1\r" > ${tty}`,
+    // 3. 等待模組回應
+    `sleep 0.5`,
+    // 4. 只讀一行回應，避免 cat 卡住
+    `head -n 1 ${tty}`
   ].join(' && ');
 
-  exec(cmd, { timeout: 2000 }, (error, stdout, stderr) => {
+  exec(cmd, { timeout: 3000 }, (error, stdout, stderr) => {
     if (error) {
       console.error('AT 查詢失敗：', error);
       return callback(null);
     }
-    // 從 stdout 中找 +CGPADDR: 1,"10.64.0.5" 這類格式
+
+    // stdout 範例: +CGPADDR: 1,"10.64.0.5"
     const match = stdout.match(/\+CGPADDR:\s*\d+,"(\d+\.\d+\.\d+\.\d+)"/);
     if (match) {
       callback(match[1]);
     } else {
-      console.warn('沒有解析到 PDP IP，回傳內容：', stdout);
+      console.warn('無法解析 PDP IP，原始回應：', stdout.trim());
       callback(null);
     }
   });

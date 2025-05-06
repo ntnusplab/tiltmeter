@@ -180,7 +180,7 @@ app.post('/connection-status', async (req, res) => {
 
 // 3. POST /restart_network: 執行 ../mbim_start_connect.sh 並回傳完整日誌
 app.post('/restart_network', (req, res) => {
-  const scriptPath = path.join(__dirname, '..', 'mbim_start_connect.sh');
+  const scriptPath = path.join(__dirname, '..', '4G_start_connect.sh');
   const proc = spawn('bash', [scriptPath]);
   let log = '';
 

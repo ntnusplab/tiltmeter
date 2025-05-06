@@ -106,11 +106,10 @@ app.post('/restart_tiltmeter', (req, res) => {
   });
 });
 
-// 取代掉所有 SerialPort 的程式碼
 function getModemIP() {
   const script = path.join(__dirname, '..', 'get_nas_signaling_ip.sh');
   return new Promise((resolve, reject) => {
-    exec(`sudo bash "${script}"`, { timeout: 5000 }, (err, stdout, stderr) => {
+    exec(`"${script}"`, { timeout: 5000 }, (err, stdout, stderr) => {
       if (err) {
         return reject(new Error(stderr.trim() || err.message));
       }
@@ -125,23 +124,13 @@ function getModemIP() {
 }
 
 app.post('/connection-status', async (req, res) => {
-  const { IP, PORT } = req.body;
-  if (!IP || !PORT) {
-    return res.status(400).json({ connected: false, message: '請提供 IP/PORT' });
-  }
-
-  let eth0IP;
   try {
-    eth0IP = await getModemIP();
+    const eth0IP = await getModemIP();
+    console.log('取得 NAS IP 成功：', eth0IP);
   } catch (e) {
     console.error('取得 NAS IP 失敗：', e);
     return res.status(500).json({ connected: false, message: '從 modem 取得 IP 失敗' });
   }
-
-  exec(`nc -z -v ${IP} ${PORT}`, (err) => {
-    if (err) return res.json({ connected: false, message: '連線失敗', eth0IP });
-    res.json({ connected: true, message: '連線測試成功', eth0IP });
-  });
 });
 
 // 3. POST /restart_network: 執行 ../mbim_start_connect.sh 並回傳完整日誌

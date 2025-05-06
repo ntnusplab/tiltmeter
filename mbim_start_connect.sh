@@ -1,17 +1,3 @@
-# #!/bin/bash
-
-# # 停止之前可能存在的 waveshare-CM
-# pkill -f waveshare-CM
-
-# # 載入APN設定
-# source /home/admin/tiltmeter/sys.conf
-
-# echo "正在使用 APN: $APN 啟動 4G 連線..."
-
-# # 使用 nohup 來啟動，保證後台穩定執行，不受腳本結束影響
-# nohup waveshare-CM -s "$APN" >/dev/null 2>&1 &
-
-
 #!/bin/bash
 
 # 1. 停止任何現存的 4G 連線程式（如 pppd、qmicli 或 waveshare-CM）
@@ -31,9 +17,6 @@ CID=1
 
 echo "◆ 設定 PDP Context ${CID} APN 為：${APN}"
 echo "◆ 使用序列埠：${TTY}"
-
-# 4. 把序列埠設成 raw、115200 baud、關 echo
-stty -F "$TTY" raw cs8 115200 -echo
 
 # 5. 發出 AT 指令修改 APN
 #    格式：AT+CGDCONT=<CID>,"IP","<APN>"

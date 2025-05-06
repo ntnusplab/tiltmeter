@@ -1,6 +1,7 @@
 'use strict';
 
 let flatConfig = {};
+let isChecking = false;  // 锁标志
 
 // 控制設定，決定哪些項目隱藏、唯讀或可修改
 const dropdownConfig = {
@@ -141,20 +142,30 @@ function updateConfig(key, value) {
 }
 
 
-// 檢查網際網路連線狀況
 async function checkConnectionStatus() {
-  console.log('checkConnectionStatus() 被呼叫');
+  // 如果上一次还没结束，就跳过
+  if (isChecking) {
+    console.log('上一轮检查还在进行中，跳过本次请求');
+    return;
+  }
+  isChecking = true;
+
+  const btn = document.getElementById('refreshConnectionBtn');
+  if (btn) btn.disabled = true;
 
   const statusEl = document.getElementById('connectionStatus');
   const host = flatConfig.BACKUP_TCP_HOST;
   const port = flatConfig.BACKUP_TCP_PORT;
 
   if (!host || !port) {
-    statusEl.innerText = '請先在「可修改設定」中填寫備份 TCP 傳輸的 HOST 與 PORT';
+    statusEl.innerText   = '請先在「可修改設定」中填寫備份 TCP 傳輸的 HOST 與 PORT';
     statusEl.style.color = 'red';
+    isChecking = false;
+    if (btn) btn.disabled = false;
     return;
   }
 
+  console.log('▶▶ 開始檢查連線…');
   try {
     const res = await fetch('/connection-status', {
       method: 'POST',
@@ -162,14 +173,10 @@ async function checkConnectionStatus() {
       body: JSON.stringify({ IP: host, PORT: port })
     });
 
-    console.log('fetch 完成，HTTP 狀態：', res.status);
     const text = await res.text();
-    console.log('原始回應文字：', text);
-
     let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
+    try { data = JSON.parse(text); }
+    catch {
       throw new Error(`非 JSON 回應：${text}`);
     }
 
@@ -177,34 +184,28 @@ async function checkConnectionStatus() {
       throw new Error(data.message || `HTTP ${res.status}`);
     }
 
-    console.log('解析後 JSON：', data);
     let msg = data.message || '未知狀態';
-    if (data.wwan0IP) {
-      msg += ` IP:${data.wwan0IP}`;
-    }
-    statusEl.innerText = msg;
+    if (data.wwan0IP) msg += ` (WWAN IP: ${data.wwan0IP})`;
+    statusEl.innerText   = msg;
     statusEl.style.color = data.connected ? 'green' : 'red';
 
   } catch (err) {
     console.error('checkConnectionStatus 發生錯誤：', err);
-    statusEl.innerText = `連線檢查錯誤：${err.message}`;
+    statusEl.innerText   = `連線檢查錯誤：${err.message}`;
     statusEl.style.color = 'red';
+  } finally {
+    isChecking = false;
+    if (btn) btn.disabled = false;
   }
 }
 
-// DOM 載入後再綁事件、讀取設定與啟動檢查
 document.addEventListener('DOMContentLoaded', () => {
+  // 手動按鈕
   document.getElementById('refreshConnectionBtn')
-    .addEventListener('click', checkConnectionStatus);
-  document.getElementById('refreshConfigBtn')
-    .addEventListener('click', () => {
-      loadConfig().then(checkConnectionStatus);
-    });
-
-  // 第一次載入時，同步讀設定並檢查
+          .addEventListener('click', checkConnectionStatus);
+  // 讀完設定後先檢查一次
   loadConfig().then(checkConnectionStatus);
-
-  // 每 10 秒自動檢查一次
+  // 每 30 秒自動檢查
   setInterval(checkConnectionStatus, 30000);
 });
 

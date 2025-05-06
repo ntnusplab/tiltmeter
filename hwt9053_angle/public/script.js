@@ -131,39 +131,74 @@ function updateConfig(key, value) {
     })
     .catch(err => console.error('Error:', err));
 }
+
+
+// 檢查網際網路連線狀況
 async function checkConnectionStatus() {
+  console.log('checkConnectionStatus() 被呼叫');
+
   const statusEl = document.getElementById('connectionStatus');
-  const ip = document.getElementById('ipInput').value;
-  const port = document.getElementById('portInput').value;
+  const host = flatConfig.BACKUP_TCP_HOST;
+  const port = flatConfig.BACKUP_TCP_PORT;
+
+  if (!host || !port) {
+    statusEl.innerText = '請先在「可修改設定」中填寫備份 TCP 傳輸的 HOST 與 PORT';
+    statusEl.style.color = 'red';
+    return;
+  }
+
   try {
     const res = await fetch('/connection-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ IP: ip, PORT: port })
+      body: JSON.stringify({ IP: host, PORT: port })
     });
+
+    console.log('fetch 完成，HTTP 狀態：', res.status);
     const text = await res.text();
+    console.log('原始回應文字：', text);
+
     let data;
-    try { data = JSON.parse(text); } catch {
+    try {
+      data = JSON.parse(text);
+    } catch {
       throw new Error(`非 JSON 回應：${text}`);
     }
+
     if (!res.ok) {
-      const errMsg = data.message || data.error || `HTTP ${res.status}`;
-      throw new Error(errMsg);
+      throw new Error(data.message || `HTTP ${res.status}`);
     }
+
+    console.log('解析後 JSON：', data);
     let msg = data.message || '未知狀態';
-    if (data.wwan0IP) msg += ` (IP: ${data.wwan0IP})`;
-    statusEl.innerText   = msg;
+    if (data.wwan0IP) {
+      msg += ` (WWAN IP: ${data.wwan0IP})`;
+    }
+    statusEl.innerText = msg;
     statusEl.style.color = data.connected ? 'green' : 'red';
-  } catch (e) {
-    console.error('Error:', e);
-    statusEl.innerText   = `錯誤：${e.message}`;
+
+  } catch (err) {
+    console.error('checkConnectionStatus 發生錯誤：', err);
+    statusEl.innerText = `連線檢查錯誤：${err.message}`;
     statusEl.style.color = 'red';
   }
 }
 
-setInterval(checkConnectionStatus, 10000);
-document.getElementById('refreshConnectionBtn').addEventListener('click', checkConnectionStatus);
-document.getElementById('refreshConfigBtn').addEventListener('click', loadConfig);
+// DOM 載入後再綁事件、讀取設定與啟動檢查
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('refreshConnectionBtn')
+    .addEventListener('click', checkConnectionStatus);
+  document.getElementById('refreshConfigBtn')
+    .addEventListener('click', () => {
+      loadConfig().then(checkConnectionStatus);
+    });
+
+  // 第一次載入時，同步讀設定並檢查
+  loadConfig().then(checkConnectionStatus);
+
+  // 每 10 秒自動檢查一次
+  setInterval(checkConnectionStatus, 10000);
+});
 
 // 新增重新開機按鈕事件，呼叫 /restart_tiltmeter API
 document.getElementById('restartTiltmeterBtn').addEventListener('click', function () {

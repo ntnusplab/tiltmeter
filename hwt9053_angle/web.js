@@ -193,7 +193,7 @@ app.get('/connection-status', (req, res) => {
 });
 
 app.post('/restart_network', (req, res) => {
-  const script = '/home/admin/tiltmeter/mbim_start_connection.sh';
+  const script = '/home/admin/tiltmeter/mbim_start_connect.sh';
 
   exec(`bash ${script}`, (error, stdout, stderr) => {
     if (error) {

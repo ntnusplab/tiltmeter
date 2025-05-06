@@ -110,7 +110,7 @@ app.post('/restart_tiltmeter', (req, res) => {
 function getModemIP() {
   const script = path.join(__dirname, '..', 'get_nas_signaling_ip.sh');
   return new Promise((resolve, reject) => {
-    exec(`sudo bash "${script}" /dev/ttyUSB2 115200 3`, { timeout: 5000 }, (err, stdout, stderr) => {
+    exec(`sudo bash "${script}"`, { timeout: 5000 }, (err, stdout, stderr) => {
       if (err) {
         return reject(new Error(stderr.trim() || err.message));
       }

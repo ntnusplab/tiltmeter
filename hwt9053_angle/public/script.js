@@ -50,15 +50,23 @@ function login() {
 
 // 讀取後端設定資料，並整合 sys 與 env（若同一 key 同時存在，以 sys 優先）
 function loadConfig() {
-  fetch('/config-json')
-    .then(res => res.json())
+  return fetch('/config-json')                // ← 加上 return
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    })
     .then(data => {
       flatConfig = {};
       Object.assign(flatConfig, data.env, data.sys);
       populateConfigControls(flatConfig, dropdownConfig);
+      return flatConfig;                      // ← （可選）回傳給下游使用
     })
-    .catch(err => console.error('Error:', err));
+    .catch(err => {
+      console.error('loadConfig 失敗：', err);
+      throw err;                               // ← 讓呼叫端也能抓到錯誤
+    });
 }
+
 
 // 根據後端取得的設定與控制設定，分別建立唯讀與可修改項目
 function populateConfigControls(configJson, controlConfig) {

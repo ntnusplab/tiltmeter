@@ -21,7 +21,7 @@ echo "◆ 使用序列埠：${TTY}"
 
 # 4. 設定 serial 埠：只設 baud rate 與 cs8
 if ! stty -F "$TTY" 115200 cs8; then
-  echo "⚠️ stty 無法完全設定 $TTY（忽略）"
+  echo "stty 無法完全設定 $TTY（忽略）"
 fi
 
 # 5. 發出 AT 指令修改 APN

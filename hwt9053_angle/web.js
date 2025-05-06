@@ -107,41 +107,84 @@ app.post('/restart_tiltmeter', (req, res) => {
 });
 
 
-// Function to get IP from modem via external script
+// --- 串行化腳本调用，避免并发打开串口 ---
+let ipLock = Promise.resolve();
 function getModemIP() {
+  ipLock = ipLock
+    .catch(() => {})         // 忽略上一次的错误
+    .then(() => doGetModemIP());
+  return ipLock;
+}
+function doGetModemIP() {
   const script = path.join(__dirname, '..', 'get_nas_signaling_ip.sh');
   return new Promise((resolve, reject) => {
-    exec(`bash "${script}"`, { timeout: 10000 }, (err, stdout, stderr) => {
+    exec(`bash "${script}" /dev/ttyUSB2 115200 3`, { timeout: 5000 }, (err, stdout, stderr) => {
       if (err) return reject(new Error(stderr.trim() || err.message));
       const ip = stdout.trim();
-      if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) resolve(ip);
-      else reject(new Error(`無效回傳：${ip}`));
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return resolve(ip);
+      reject(new Error(`無效回傳：${ip}`));
     });
   });
 }
 
-// POST connection status
+// --- 帶重試機制的取得 IP 函數 ---
+async function getModemIPWithRetry(retries = 3, delayMs = 500) {
+  let lastErr;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await getModemIP();
+    } catch (e) {
+      lastErr = e;
+      console.warn(`getModemIP 第 ${i + 1} 次失敗：`, e.message);
+      if (i < retries - 1) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw lastErr;
+}
+
+// --- /connection-status 改寫，不再 fallback 系統 IP ---
 app.post('/connection-status', async (req, res) => {
-  const { IP, PORT } = req.body;
-  if (!IP || !PORT) return res.status(400).json({ connected: false, message: '請提供 IP 與 PORT' });
+  const { IP: remoteIP, PORT: remotePort } = req.body;
+  if (!remoteIP || !remotePort) {
+    return res.status(400).json({
+      connected: false,
+      message: '請提供目標 IP 與 PORT'
+    });
+  }
 
   let wwan0IP;
   try {
-    wwan0IP = await getModemIP();
-    console.log('取得的 WWAN0 IP：', wwan0IP);
+    wwan0IP = await getModemIPWithRetry(3, 500);
+    console.log('+++ 取得 WWAN0 IP：', wwan0IP);
   } catch (e) {
-    console.error('取得 NAS IP 失敗：', e);
-    return res.status(500).json({ connected: false, message: '從 modem 取得 IP 失敗' });
+    console.error('*** 從 4G 模組取得 IP 失敗：', e.message);
+    // 直接回 500 錯誤，不做任何 fallback
+    return res.status(500).json({
+      connected: false,
+      message: `從 4G 模組取得 IP 失敗：${e.message}`
+    });
   }
 
-  exec(`nc -z -v ${IP} ${PORT}`, (err) => {
+  // 再做連通性測試
+  exec(`nc -z -v ${remoteIP} ${remotePort}`, (err) => {
     if (err) {
-      return res.json({ connected: false, message: `連線失敗`, wwan0IP });
+      console.log(`--- 與 ${remoteIP}:${remotePort} 連線失敗`);
+      return res.json({
+        connected: false,
+        message: `無法連線到 ${remoteIP}:${remotePort}`,
+        wwan0IP
+      });
     }
-    res.json({ connected: true, message: `連線成功`, wwan0IP });
+    console.log(`+++ 與 ${remoteIP}:${remotePort} 連線成功`);
+    res.json({
+      connected: true,
+      message: `連線到 ${remoteIP}:${remotePort} 成功`,
+      wwan0IP
+    });
   });
 });
-
 
 // 3. POST /restart_network: 執行 ../mbim_start_connect.sh 並回傳完整日誌
 app.post('/restart_network', (req, res) => {

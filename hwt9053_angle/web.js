@@ -106,53 +106,26 @@ app.post('/restart_tiltmeter', (req, res) => {
   });
 });
 
-// 取代 getETH0IP()：直接發 AT+CGPADDR=1 給 modem
+// 改寫 getModemIP：改用你的 bash 腳本
 function getModemIP() {
+  const script = path.join(__dirname, '..', 'get_nas_signaling_ip.sh');
   return new Promise((resolve, reject) => {
-    const port = new SerialPort('/dev/ttyUSB2', {
-      baudRate: 115200,
-      autoOpen: true,
-      dataBits: 8,
-      stopBits: 1,
-      parity: 'none',
-    });
-    const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
-
-    let timeout = setTimeout(() => {
-      port.close();
-      reject(new Error('AT 指令無回應'));
-    }, 3000);
-
-    parser.on('data', line => {
-      // 範例回應： +CGPADDR: 1,"10.64.123.45"
-      if (line.startsWith('+CGPADDR:')) {
-        clearTimeout(timeout);
-        port.close();
-        const m = line.match(/"(.+?)"/);
-        if (m) return resolve(m[1]);
+    exec(`sudo bash "${script}" /dev/ttyUSB2 115200 3`, { timeout: 5000 }, (err, stdout, stderr) => {
+      if (err) {
+        return reject(new Error(stderr.trim() || err.message));
       }
-      // 也可監聽 OK / ERROR 來結束
-      if (line === 'OK') {
-        clearTimeout(timeout);
-        port.close();
-        // 如果還沒 match IP，就回 null
-        return resolve(null);
-      }
-      if (line === 'ERROR') {
-        clearTimeout(timeout);
-        port.close();
-        return reject(new Error('modem 回錯誤'));
+      const ip = stdout.trim();
+      // 驗證格式
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
+        resolve(ip);
+      } else {
+        reject(new Error(`無效回傳：${ip}`));
       }
     });
-
-    // 先關 echo（選擇性）
-    port.write('ATE0\r');
-    // 然後要求 PDP Context 1 的 IP
-    port.write('AT+CGPADDR=1\r');
   });
 }
 
-// 在 /connection-status 裡改用 getModemIP()
+// 在 /connection-status 裡使用
 app.post('/connection-status', async (req, res) => {
   const { IP, PORT } = req.body;
   if (!IP || !PORT) {
@@ -163,11 +136,8 @@ app.post('/connection-status', async (req, res) => {
   try {
     eth0IP = await getModemIP();
   } catch (e) {
-    console.error('getModemIP error:', e);
+    console.error('取得 NAS IP 失敗：', e);
     return res.status(500).json({ connected: false, message: '無法從 modem 取得 IP' });
-  }
-  if (!eth0IP) {
-    return res.json({ connected: false, message: 'modem 尚未分配 IP', eth0IP: null });
   }
 
   exec(`nc -z -v ${IP} ${PORT}`, (err) => {
@@ -177,7 +147,6 @@ app.post('/connection-status', async (req, res) => {
     res.json({ connected: true, message: '連線測試成功', eth0IP });
   });
 });
-
 // 3. POST /restart_network: 執行 ../mbim_start_connect.sh 並回傳完整日誌
 app.post('/restart_network', (req, res) => {
   const scriptPath = path.join(__dirname, '..', '4G_start_connect.sh');

@@ -106,32 +106,41 @@ app.post('/restart_tiltmeter', (req, res) => {
   });
 });
 
+
+// Function to get IP from modem via external script
 function getModemIP() {
   const script = path.join(__dirname, '..', 'get_nas_signaling_ip.sh');
   return new Promise((resolve, reject) => {
-    exec(`"${script}"`, { timeout: 5000 }, (err, stdout, stderr) => {
-      if (err) {
-        return reject(new Error(stderr.trim() || err.message));
-      }
+    exec(`bash "${script}"`, { timeout: 5000 }, (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr.trim() || err.message));
       const ip = stdout.trim();
-      if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
-        resolve(ip);
-      } else {
-        reject(new Error(`無效回傳：${ip}`));
-      }
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) resolve(ip);
+      else reject(new Error(`無效回傳：${ip}`));
     });
   });
 }
 
+// POST connection status
 app.post('/connection-status', async (req, res) => {
+  const { IP, PORT } = req.body;
+  if (!IP || !PORT) return res.status(400).json({ connected: false, message: '請提供 IP 與 PORT' });
+
+  let wwan0IP;
   try {
-    const eth0IP = await getModemIP();
-    console.log('取得 NAS IP 成功：', eth0IP);
+    wwan0IP = await getModemIP();
   } catch (e) {
     console.error('取得 NAS IP 失敗：', e);
     return res.status(500).json({ connected: false, message: '從 modem 取得 IP 失敗' });
   }
+
+  exec(`nc -z -v ${IP} ${PORT}`, (err) => {
+    if (err) {
+      return res.json({ connected: false, message: `與遠端主機(${IP}:${PORT})連線失敗`, wwan0IP });
+    }
+    res.json({ connected: true, message: `與遠端主機(${IP}:${PORT})連線成功`, wwan0IP });
+  });
 });
+
 
 // 3. POST /restart_network: 執行 ../mbim_start_connect.sh 並回傳完整日誌
 app.post('/restart_network', (req, res) => {

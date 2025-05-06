@@ -107,7 +107,7 @@ app.post('/restart_tiltmeter', (req, res) => {
 
 // 取得 wwan0 的 IP 位址
 function getWWAN0IP(callback) {
-  exec('ip addr show wwan0', (error, stdout, stderr) => {
+  exec('ip addr show eth0', (error, stdout, stderr) => {
     if (error) {
       return callback(null);
     }

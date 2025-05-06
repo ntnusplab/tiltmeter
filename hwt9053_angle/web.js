@@ -132,7 +132,7 @@ function getWWAN0IP(callback) {
   const onDone = ip => {
     if (done) return;
     done = true;
-    try { port.close(); } catch {} 
+    try { port.close(); } catch { }
     callback(ip);
   };
 
@@ -192,174 +192,27 @@ app.get('/connection-status', (req, res) => {
   });
 });
 
-
 app.post('/restart_network', (req, res) => {
-  const portPath   = '/dev/ttyUSB2';    // 請確認你的 AT 控制埠
-  const baudRate   = 115200;
-  const atCommand  = 'AT+CFUN=1,1';
-  let responseSent = false;
+  const script = '/home/admin/tiltmeter/mbim_start_connection.sh';
 
-  // 幫你安全關埠
-  function safeClosePort(port) {
-    if (port.isOpen) {
-      port.close(err => {
-        if (err && err.message !== 'Port is not open')
-          console.error('關閉序列埠錯誤:', err.message);
+  exec(`bash ${script}`, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`執行重啟腳本失敗：${error}`);
+      return res.json({
+        success: false,
+        message: `執行腳本失敗：${error.message}`,
+        stderr: stderr.trim()
       });
     }
-  }
 
-  // 打開串口但不馬上發回 HTTP
-  const port = new SerialPort({
-    path: portPath,
-    baudRate,
-    autoOpen: false
-  });
-
-  const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
-
-  // 當 parser 收到一行
-  parser.on('data', line => {
-    console.log('<< 4G 回應:', line);
-    if (responseSent) return;
-
-    // 如果看到了 OK，就認定重啟指令下達成功
-    if (/^OK$/i.test(line.trim())) {
-      responseSent = true;
-      res.json({ success: true, message: '已向 4G 模組發送重啟指令' });
-      safeClosePort(port);
-    }
-  });
-
-  // 開不到就直接回錯誤
-  port.open(err => {
-    if (err) {
-      console.error('開啟序列埠失敗:', err.message);
-      if (!responseSent) {
-        responseSent = true;
-        return res.json({ success: false, message: `開啟串口失敗：${err.message}` });
-      }
-    }
-
-    // 清掉舊資料
-    port.flush(flushErr => {
-      if (flushErr) console.warn('flush 錯誤，繼續。');
-
-      // 送出指令
-      console.log('>> 送出重啟指令:', atCommand);
-      port.write(atCommand + '\r', writeErr => {
-        if (writeErr && !responseSent) {
-          console.error('串口寫入失敗:', writeErr.message);
-          responseSent = true;
-          res.json({ success: false, message: `AT 指令下發失敗：${writeErr.message}` });
-          safeClosePort(port);
-        }
-      });
+    console.log(`重啟腳本輸出：\n${stdout}`);
+    res.json({
+      success: true,
+      message: '4G 模組 APN 已更新並發送重啟指令',
+      output: stdout.trim()
     });
   });
-
-  // 5 秒後若都沒收到 OK，就 timeout
-  setTimeout(() => {
-    if (!responseSent) {
-      responseSent = true;
-      console.warn('等待 AT 回應超時');
-      res.json({ success: false, message: '4G 模組無回應 (AT 超時)' });
-      safeClosePort(port);
-    }
-  }, 30000);
 });
-
-// app.post('/restart_network', (req, res) => {
-//   const portPath = '/dev/ttyUSB2'; // 根據你的實際連接埠調整
-//   const baudRate = 115200;
-//   const atCommand = 'AT+CFUN=1,1';
-
-//   // 開啟串口
-//   const port = new SerialPort({ path: portPath, baudRate: baudRate }, (err) => {
-//     if (err) {
-//       console.error(`Error opening serial port: ${err.message}`);
-//       return res.json({ success: false, message: `開啟串口失敗：${err.message}` });
-//     }
-//   });
-
-//   const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
-//   let responseSent = false;
-
-//   // 定義一個關閉串口的函式，檢查是否開啟中
-//   function safeClosePort() {
-//     if (port.isOpen) {
-//       port.close((err) => {
-//         if (err && err.message !== 'Port is not open') {
-//           console.error(`Closing port error: ${err.message}`);
-//         }
-//       });
-//     }
-//   }
-
-//   // 設定 5 秒超時機制，如果在 5 秒內未收到 AT 指令回應，就嘗試關閉串口
-//   const atTimeout = setTimeout(() => {
-//     if (!responseSent) {
-//       console.warn('5秒內未收到AT指令回應，嘗試關閉串口');
-//       safeClosePort();
-//     }
-//   }, 5000);
-
-//   // 監聽串口回應
-//   parser.on('data', (data) => {
-//     console.log(`Received response: ${data}`);
-//     if (!responseSent) {
-//       clearTimeout(atTimeout);
-//       res.json({ success: true, message: '4G 模組已發送重啟指令' });
-//       responseSent = true;
-//       safeClosePort();
-//     }
-//   });
-
-//   // 當串口開啟後，發送 AT 指令
-//   port.on('open', () => {
-//     console.log(`Sending command: ${atCommand}`);
-//     port.write(atCommand + '\r\n', (err) => {
-//       if (err) {
-//         console.error(`Error writing to serial port: ${err.message}`);
-//         if (!responseSent) {
-//           clearTimeout(atTimeout);
-//           res.json({ success: false, message: `發送 AT 指令失敗：${err.message}` });
-//           responseSent = true;
-//         }
-//         safeClosePort();
-//       }
-//     });
-//   });
-
-//   // 監聽錯誤事件
-//   port.on('error', (err) => {
-//     console.error(`Serial port error: ${err.message}`);
-//     if (!responseSent) {
-//       clearTimeout(atTimeout);
-//       res.json({ success: false, message: `串口錯誤：${err.message}` });
-//       responseSent = true;
-//     }
-//     safeClosePort();
-//   });
-
-//   // 延遲 30 秒後執行 exec 指令重啟網路
-//   setTimeout(() => {
-//     exec('sudo systemctl restart mbim_start_connect.service', (error, stdout, stderr) => {
-//       if (error) {
-//         console.error(`restart network error: ${error}`);
-//         if (!responseSent) {
-//           res.json({ success: false, message: `網路重新連線失敗：${error.message}` });
-//           responseSent = true;
-//         }
-//         return;
-//       }
-//       if (!responseSent) {
-//         res.json({ success: true, message: '網路已重新連線' });
-//         responseSent = true;
-//       }
-//     });
-//   }, 30000); // 可根據需求調整延遲時間
-// });
 
 // 新增 API：POST /restart_sensor 來重啟感測器
 app.post('/restart_sensor', (req, res) => {

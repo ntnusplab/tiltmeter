@@ -7,31 +7,40 @@ pkill -f waveshare-CM
 
 # 2. 載入 APN 設定
 source /home/admin/tiltmeter/sys.conf
-#    sys.conf 範例：
-#    APN="internet"
-#    PDP_CID=1
+# sys.conf 範例：
+#   APN="internet"
+#   PDP_CID=1
 
-# 3. 設定要用的序列埠（請依實際情況調整）
+# 3. 設定要用的序列埠與 CID
 TTY="/dev/ttyUSB2"
-CID=1
+CID="${PDP_CID:-1}"
 
 echo "◆ 設定 PDP Context ${CID} APN 為：${APN}"
 echo "◆ 使用序列埠：${TTY}"
 
+# 4. 把序列埠設成 raw、115200 baud、關 echo（確保正確送/收）
+stty -F "$TTY" raw cs8 115200 -echo
+
 # 5. 發出 AT 指令修改 APN
 #    格式：AT+CGDCONT=<CID>,"IP","<APN>"
 echo -e "AT+CGDCONT=${CID},\"IP\",\"${APN}\"\r" > "$TTY"
-
-# 6. 稍作等待，讓模組回應
 sleep 0.5
 
-# 7. 用 AT+CGDCONT? 讀回所有 context 設定，並過濾出剛改的那一行
+# 6. 讀回確認
 echo -e "AT+CGDCONT?\r" > "$TTY"
 sleep 0.5
-# 只印包含 +CGDCONT 且包含你指定 CID 的行
+# 只印包含 +CGDCONT 且包含你指定 CID 的那一行
 grep "+CGDCONT" < "$TTY" | grep "${CID}"
 
-# 8. 恢復序列埠 echo（可選）
+# 7. 恢復序列埠 echo（可選）
 stty -F "$TTY" echo
 
-echo "◆ APN 設定完成。"
+# ————————————
+# 8. 在更新 APN 之後，發送重啟模組指令
+echo "◆ 發送模組重啟指令 (AT+CFUN=1,1)..."
+stty -F "$TTY" raw cs8 115200 -echo    # 再次確保 port 設定正確
+echo -e "AT+CFUN=1,1\r" > "$TTY"
+sleep 0.5
+stty -F "$TTY" echo
+
+echo "◆ 4G 模組重啟指令已送出"

@@ -1,1 +1,0 @@
-wget -O - https://files.waveshare.com/wiki/PCIe-TO-4G-5G-M.2-USB3.2-HAT-Plus/install.sh | sudo bash

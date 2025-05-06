@@ -119,54 +119,61 @@ app.post('/restart_tiltmeter', (req, res) => {
 //     }
 //   });
 // }
-
 function getWWAN0IP(callback) {
-  const tty = '/dev/ttyUSB2';  // AT 控制埠
+  const tty = '/dev/ttyUSB2';
   const port = new SerialPort({
     path: tty,
     baudRate: 115200,
     autoOpen: false,
+    lock: false,        // <- 跳过系统 lockfile
   });
 
   let done = false;
-  const onDone = ip => {
+  function safeClose() {
+    if (port.isOpen) {
+      port.close(err => {
+        if (err && err.message !== 'Port is not open')
+          console.error('關閉序列埠錯誤:', err.message);
+      });
+    }
+  }
+
+  function finish(ip) {
     if (done) return;
     done = true;
-    try { port.close(); } catch { }
+    safeClose();
     callback(ip);
-  };
+  }
 
   port.open(err => {
     if (err) {
       console.error('開啟序列埠失敗：', err.message);
-      return onDone(null);
+      return finish(null);
     }
 
     const parser = port.pipe(new ReadlineParser({ delimiter: '\r\n' }));
     parser.on('data', line => {
-      // 如果你想除錯，可以先打出所有回傳：
-      // console.log('<<', line);
       const m = line.match(/\+CGPADDR:\s*\d+,"?(\d+\.\d+\.\d+\.\d+)"?/);
-      if (m) {
-        onDone(m[1]);
-      }
+      if (m) finish(m[1]);
     });
 
-    // 清空任何殘留資料，再送指令
-    port.flush(flushErr => {
-      if (flushErr) {
-        console.warn('flush 失敗，繼續寫指令');
-      }
-      port.write('AT+CGPADDR=1\r', writeErr => {
-        if (writeErr) {
-          console.error('送出 AT 指令失敗：', writeErr.message);
-          onDone(null);
+    port.flush(() => {
+      port.write('AT+CGPADDR=1\r', wrErr => {
+        if (wrErr) {
+          console.error('送出 AT 失敗：', wrErr.message);
+          finish(null);
         }
       });
     });
 
-    // 2 秒後若沒回應，就收尾
-    setTimeout(() => onDone(null), 2000);
+    // 2 秒超時
+    setTimeout(() => finish(null), 2000);
+  });
+
+  // 也可以在这里捕捉 error 事件
+  port.on('error', err => {
+    console.error('串口錯誤：', err.message);
+    finish(null);
   });
 }
 

@@ -136,9 +136,9 @@ app.post('/connection-status', async (req, res) => {
 
   exec(`nc -z -v ${IP} ${PORT}`, (err) => {
     if (err) {
-      return res.json({ connected: false, message: `與遠端主機(${IP}:${PORT})連線失敗`, wwan0IP });
+      return res.json({ connected: false, message: `連線失敗`, wwan0IP });
     }
-    res.json({ connected: true, message: `與遠端主機(${IP}:${PORT})連線成功`, wwan0IP });
+    res.json({ connected: true, message: `連線成功`, wwan0IP });
   });
 });
 

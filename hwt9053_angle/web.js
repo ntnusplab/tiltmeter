@@ -105,16 +105,44 @@ app.post('/restart_tiltmeter', (req, res) => {
 });
 
 
-// 取得 wwan0 的 IP 位址
+// // 取得 wwan0 的 IP 位址
+// function getWWAN0IP(callback) {
+//   exec('ip addr show eth0', (error, stdout, stderr) => {
+//     if (error) {
+//       return callback(null);
+//     }
+//     const match = stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
+//     if (match) {
+//       callback(match[1]);
+//     } else {
+//       callback(null);
+//     }
+//   });
+// }
+
 function getWWAN0IP(callback) {
-  exec('ip addr show eth0', (error, stdout, stderr) => {
+  // 把 AT 指令送到 /dev/ttyUSB2，再讀一次回傳內容
+  // 注意：根據你的系統實際序列埠檔名調整 /dev/ttyUSB2
+  const cmd = [
+    // 1) 送出 AT 指令
+    'echo -e "AT+CGPADDR=1\\r" > /dev/ttyUSB2',
+    // 2) 等一下 modem 回應
+    'sleep 0.2',
+    // 3) 讀序列埠輸出
+    'cat /dev/ttyUSB2'
+  ].join(' && ');
+
+  exec(cmd, { timeout: 2000 }, (error, stdout, stderr) => {
     if (error) {
+      console.error('AT 查詢失敗：', error);
       return callback(null);
     }
-    const match = stdout.match(/inet\s+(\d+\.\d+\.\d+\.\d+)/);
+    // 從 stdout 中找 +CGPADDR: 1,"10.64.0.5" 這類格式
+    const match = stdout.match(/\+CGPADDR:\s*\d+,"(\d+\.\d+\.\d+\.\d+)"/);
     if (match) {
       callback(match[1]);
     } else {
+      console.warn('沒有解析到 PDP IP，回傳內容：', stdout);
       callback(null);
     }
   });

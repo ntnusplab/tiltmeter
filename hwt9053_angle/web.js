@@ -111,7 +111,7 @@ app.post('/restart_tiltmeter', (req, res) => {
 function getModemIP() {
   const script = path.join(__dirname, '..', 'get_nas_signaling_ip.sh');
   return new Promise((resolve, reject) => {
-    exec(`bash "${script}"`, { timeout: 5000 }, (err, stdout, stderr) => {
+    exec(`bash "${script}"`, { timeout: 10000 }, (err, stdout, stderr) => {
       if (err) return reject(new Error(stderr.trim() || err.message));
       const ip = stdout.trim();
       if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) resolve(ip);

@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadConfig().then(checkConnectionStatus);
 
   // 每 10 秒自動檢查一次
-  setInterval(checkConnectionStatus, 10000);
+  setInterval(checkConnectionStatus, 30000);
 });
 
 // 新增重新開機按鈕事件，呼叫 /restart_tiltmeter API

@@ -144,8 +144,7 @@ async function getModemIPWithRetry(retries = 3, delayMs = 500) {
   throw lastErr;
 }
 
-// --- /connection-status 改寫，不再 fallback 系統 IP ---
-app.post('/connection-status', async (req, res) => {
+app.post('/connection-status', (req, res) => {
   const { IP: remoteIP, PORT: remotePort } = req.body;
   if (!remoteIP || !remotePort) {
     return res.status(400).json({
@@ -154,37 +153,47 @@ app.post('/connection-status', async (req, res) => {
     });
   }
 
-  let wwan0IP;
-  try {
-    wwan0IP = await getModemIPWithRetry(3, 500);
-    console.log('+++ 取得 WWAN0 IP：', wwan0IP);
-  } catch (e) {
-    console.error('*** 從 4G 模組取得 IP 失敗：', e.message);
-    // 直接回 500 錯誤，不做任何 fallback
+  // 1. 讀取所有網路介面資訊
+  const nets = os.networkInterfaces();
+
+  // 2. 拿到 eth0 這張介面的陣列（可能有多組 IPv4/IPv6）
+  const eth0 = nets['eth0'] || [];
+
+  // 3. 找到第一個 IPv4、非 internal（排除 127.0.0.1）
+  const localInfo = eth0.find(info =>
+    info.family === 'IPv4' && info.internal === false
+  );
+
+  if (!localInfo) {
+    // 拿不到就回錯
     return res.status(500).json({
       connected: false,
-      message: `從 4G 模組取得 IP 失敗：${e.message}`
+      message: '無法取得 eth0 的 IPv4 位址'
     });
   }
 
-  // 再做連通性測試
+  const localIP = localInfo.address;
+  console.log('+++ 取得 eth0 IP：', localIP);
+
+  // 4. 用 netcat 檢查連線
   exec(`nc -z -v ${remoteIP} ${remotePort}`, (err) => {
     if (err) {
-      console.log(`--- 與 ${remoteIP}:${remotePort} 連線失敗`);
+      console.log(`--- 嘗試連到 ${remoteIP}:${remotePort} 失敗`);
       return res.json({
         connected: false,
         message: `無法連線到 ${remoteIP}:${remotePort}`,
-        wwan0IP
+        localIP    // 回傳我們抓到的 eth0 IP
       });
     }
     console.log(`+++ 與 ${remoteIP}:${remotePort} 連線成功`);
     res.json({
       connected: true,
-      message: `連線成功`,
-      wwan0IP
+      message: '連線成功',
+      localIP
     });
   });
 });
+
 
 // 3. POST /restart_network: 執行 ../mbim_start_connect.sh 並回傳完整日誌
 app.post('/restart_network', (req, res) => {
